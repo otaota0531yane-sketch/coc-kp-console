@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#20242a">
+<title>CoC KP Console</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#20242a;--muted:#69707a;--line:#dfe3e8;--accent:#5865f2;--danger:#d64545}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+header{position:sticky;top:0;z-index:5;background:#20242a;color:#fff;padding:12px 14px;display:flex;gap:8px;align-items:center}
+header h1{font-size:17px;margin:0;flex:1}button,.btn{border:0;border-radius:9px;padding:9px 12px;background:var(--accent);color:#fff;font-weight:700}
+button.secondary{background:#fff;color:var(--text);border:1px solid #555}button.danger{background:var(--danger)}
+main{max-width:900px;margin:auto;padding:12px 12px 80px}.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:12px}.tabs button{white-space:nowrap;background:#e6e8ec;color:#30343a}.tabs button.active{background:var(--accent);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px;margin:10px 0;box-shadow:0 1px 2px #00000008}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+h2{font-size:18px;margin:5px 0 12px}h3{font-size:15px;margin:4px 0 9px}.muted{color:var(--muted);font-size:13px}
+textarea,input,select{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit;background:#fff;color:var(--text)}
+textarea{min-height:150px;resize:vertical}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+.scene{cursor:pointer}.scene.current{border:2px solid var(--accent)}.scene-title{font-weight:800}
+.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef0ff;color:#404bd0;font-size:12px}
+pre.copytext{white-space:pre-wrap;margin:0;font:inherit;line-height:1.65}.hidden{display:none}.notice{background:#fff8dc;border:1px solid #f0dc91;border-radius:10px;padding:10px}
+.kp{background:#fff4f4;border-left:4px solid var(--danger);padding:10px;border-radius:8px}.private{background:#f4f1ff;border-left:4px solid #7b61d9;padding:10px;border-radius:8px}
+.small{font-size:12px}.spacer{height:6px}.filelink{word-break:break-all}
+</style>
+</head>
+<body>
+<header>
+<h1>CoC KP Console</h1>
+<button class="secondary" onclick="exportData()">バックアップ</button>
+<label class="btn" style="cursor:pointer">復元<input hidden type="file" accept=".json" onchange="importData(this.files[0])"></label>
+</header>
+<main>
+<div class="tabs">
+<button id="t-scenes" onclick="showTab('scenes')">📖 シナリオ</button>
+<button id="t-kp" onclick="showTab('kp')">📌 KP情報</button>
+<button id="t-ho" onclick="showTab('ho')">🔒 HO</button>
+<button id="t-pc" onclick="showTab('pc')">🎲 キャラシ</button><button id="t-npc" onclick="showTab('npc')">👤 NPC</button><button id="t-enemy" onclick="showTab('enemy')">👹 敵</button><button id="t-prep" onclick="showTab('prep')">🏗️ 準備</button>
+</div>
+<div id="app"></div>
+</main>
+<script>
+const KEY="coc-kp-console-v1";
+let data=JSON.parse(localStorage.getItem(KEY)||'null')||{
+ title:"新しいシナリオ", current:0,
+ scenes:[{title:"Scene 1：導入",body:"ここにシナリオ本文を貼り付けます。",kp:"KPだけが見る情報をここに。",info:"PLに提示する情報をここに。",memo:""}],
+ important:"ここにシナリオ全体で重要な情報をまとめます。",
+ hos:[{name:"HO1",secret:"",memo:"",events:"",pc:null},{name:"HO2",secret:"",memo:"",events:"",pc:null}]
+};
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function showTab(tab){document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));document.getElementById("t-"+(tab==="scenes"?"scenes":tab)).classList.add("active");render(tab)}
+function render(tab="scenes"){
+ let a=document.getElementById("app");
+ if(tab==="scenes") return renderScenes(a);
+ if(tab==="kp") return renderKP(a);
+ if(tab==="ho") return renderHO(a);
+ if(tab==="pc") return renderPC(a); if(tab==="npc") return renderActors(a,"npc"); if(tab==="enemy") return renderActors(a,"enemy"); if(tab==="prep") return renderPrep(a);
+}
+function renderScenes(a){
+ a.innerHTML=`<div class="card"><h2>📖 ${esc(data.title)}</h2><div class="row"><button onclick="addScene()">＋シーン追加</button><button class="secondary" onclick="renameScenario()">タイトル変更</button></div></div>
+<div class="card"><h3>シーン一覧</h3>${data.scenes.map((s,i)=>`<div class="card scene ${i===data.current?'current':''}" onclick="data.current=${i};save();renderScenes(document.getElementById('app'))"><div class="between row"><span class="scene-title">${i+1}. ${esc(s.title)}</span><span class="pill">${i===data.current?'現在地':''}</span></div></div>`).join("")}</div>
+${sceneEditor()}`;
+}
+function sceneEditor(){
+ let s=data.scenes[data.current];
+ return `<div class="card"><div class="between row"><h2>${esc(s.title)}</h2><button class="danger" onclick="deleteScene()">削除</button></div>
+<label class="muted">シーン名</label><input id="st" value="${esc(s.title)}" oninput="data.scenes[data.current].title=this.value;save()">
+<div class="spacer"></div><h3>本文</h3><textarea id="body">${esc(s.body)}</textarea><button onclick="copyField('body')">本文をコピー</button>
+<div class="spacer"></div><h3>📌 KP情報</h3><div class="kp"><textarea id="skp">${esc(s.kp)}</textarea><button onclick="copyField('skp')">KP情報をコピー</button></div>
+<div class="spacer"></div><h3>📤 PLへ出す情報</h3><div class="private"><textarea id="sinfo">${esc(s.info)}</textarea><button onclick="copyField('sinfo')">情報をコピー</button></div>
+<div class="spacer"></div><h3>📝 KPメモ</h3><textarea id="smemo">${esc(s.memo)}</textarea>
+<div class="row" style="margin-top:8px"><button onclick="saveScene()">保存</button><button class="secondary" onclick="moveScene(-1)">← 前へ</button><button class="secondary" onclick="moveScene(1)">次へ →</button></div></div>`;
+}
+function saveScene(){let s=data.scenes[data.current];s.title=document.getElementById("st").value;s.body=document.getElementById("body").value;s.kp=document.getElementById("skp").value;s.info=document.getElementById("sinfo").value;s.memo=document.getElementById("smemo").value;save();renderScenes(document.getElementById("app"))}
+function copyField(id){navigator.clipboard.writeText(document.getElementById(id).value).then(()=>alert("コピーしました"))}
+function addScene(){data.scenes.push({title:`Scene ${data.scenes.length+1}`,body:"",kp:"",info:"",memo:""});data.current=data.scenes.length-1;save();renderScenes(document.getElementById("app"))}
+function deleteScene(){if(data.scenes.length<2)return alert("最後の1シーンは削除できません");if(confirm("このシーンを削除しますか？")){data.scenes.splice(data.current,1);data.current=Math.max(0,data.current-1);save();renderScenes(document.getElementById("app"))}}
+function moveScene(n){data.current=Math.min(data.scenes.length-1,Math.max(0,data.current+n));save();renderScenes(document.getElementById("app"))}
+function renameScenario(){let x=prompt("シナリオ名",data.title);if(x){data.title=x;save();renderScenes(document.getElementById("app"))}}
+function renderKP(a){
+ a.innerHTML=`<div class="card"><h2>📌 KP重要情報</h2><p class="muted">シナリオ本文を探さなくても確認したい情報をここに集約。</p><textarea id="important">${esc(data.important)}</textarea><button onclick="data.important=document.getElementById('important').value;save();alert('保存しました')">保存</button></div>
+<div class="card"><h3>現在地</h3><div class="notice">Scene ${data.current+1}：${esc(data.scenes[data.current].title)}</div><button onclick="showTab('scenes')">現在シーンを開く</button></div>`;
+}
+function renderHO(a){
+ a.innerHTML=`<div class="card"><h2>🔒 HO管理</h2><button onclick="addHO()">＋HO追加</button></div>
+${data.hos.map((h,i)=>`<div class="card"><div class="row between"><h2>${esc(h.name)}</h2><button class="danger" onclick="deleteHO(${i})">削除</button></div>
+<input value="${esc(h.name)}" oninput="data.hos[${i}].name=this.value;save()"><div class="spacer"></div>
+<h3>🔒 秘匿情報</h3><textarea id="secret${i}">${esc(h.secret)}</textarea><button onclick="copyById('secret${i}')">秘匿をコピー</button>
+<h3>🎭 HO関連イベント</h3><textarea oninput="data.hos[${i}].events=this.value;save()">${esc(h.events)}</textarea>
+<h3>📝 KP個別メモ</h3><textarea oninput="data.hos[${i}].memo=this.value;save()">${esc(h.memo)}</textarea>
+<h3>📄 キャラクターシート</h3>${h.pc?`<div class="notice filelink">登録済み：${esc(h.pc.name)}<br><button onclick="viewPC(${i})">キャラシを確認</button><button class="danger" onclick="removePC(${i})">削除</button></div>`:`<label class="btn" style="display:inline-block;cursor:pointer">画像/PDFを登録<input hidden type="file" accept="image/*,.pdf" onchange="attachPC(${i},this.files[0])"></label>`}
+</div>`).join("")}`;
+}
+function copyById(id){navigator.clipboard.writeText(document.getElementById(id).value).then(()=>alert("コピーしました"))}
+function addHO(){data.hos.push({name:"HO"+(data.hos.length+1),secret:"",memo:"",events:"",pc:null});save();renderHO(document.getElementById("app"))}
+function deleteHO(i){if(confirm(`${data.hos[i].name}を削除しますか？`)){data.hos.splice(i,1);save();renderHO(document.getElementById("app"))}}
+async function attachPC(i,file){if(!file)return;let r=new FileReader();r.onload=()=>{data.hos[i].pc={name:file.name,type:file.type,data:r.result};save();renderHO(document.getElementById("app"))};r.readAsDataURL(file)}
+function removePC(i){data.hos[i].pc=null;save();renderHO(document.getElementById("app"))}
+function viewPC(i){let p=data.hos[i].pc;if(!p)return;let w=window.open();w.document.write(`<title>${esc(p.name)}</title><body style="margin:0;background:#222;text-align:center"><embed src="${p.data}" type="${p.type}" style="width:100vw;height:100vh"></body>`)}
+function renderPC(a){
+ a.innerHTML=`<div class="card"><h2>🎲 キャラクターシート一覧</h2>${data.hos.map((h,i)=>`<div class="card"><div class="row between"><strong>${esc(h.name)}</strong>${h.pc?`<button onclick="viewPC(${i})">キャラシを開く</button>`:"<span class='muted'>未登録</span>"}</div>${h.pc?`<div class="muted">${esc(h.pc.name)}</div>`:""}</div>`).join("")}</div>`;
+}
+
+function ensureActors(){data.actors=data.actors||{npc:[],enemy:[]};data.prep=data.prep||{}}
+function renderActors(a,type){
+ ensureActors(); let arr=data.actors[type], label=type==="npc"?"NPC":"敵";
+ a.innerHTML=`<div class="card"><h2>${type==="npc"?"👤":"👹"} ${label}管理</h2>
+ <p class="muted">画像はココフォリア側で設定。ここでは駒に入れる数値・チャパレとKP情報を管理します。</p>
+ <button onclick="addActor('${type}')">＋${label}追加</button></div>${arr.map((x,i)=>actorCard(type,x,i)).join("")}`;
+}
+function actorCard(type,x,i){
+ let p=`data.actors.${type}[${i}]`;
+ return `<div class="card"><div class="row between"><h2>${esc(x.name||"未設定")}</h2><button class="danger" onclick="deleteActor('${type}',${i})">削除</button></div>
+ <label class="muted">名前</label><input value="${esc(x.name)}" oninput="${p}.name=this.value;save()">
+ <div class="grid">
+ ${["HP","MP","DEX","装甲"].map(k=>{let key={HP:"hp",MP:"mp",DEX:"dex","装甲":"armor"}[k];return `<div><label class="muted">${k}</label><input value="${esc(x[key])}" oninput="${p}.${key}=this.value;save()"></div>`}).join("")}
+ </div>
+ <h3>能力値・パラメータ</h3><textarea oninput="${p}.params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15&#10;SIZ 11&#10;INT 14&#10;EDU 16">${esc(x.params)}</textarea>
+ <h3>攻撃・技能・チャットパレット</h3><textarea oninput="${p}.commands=this.value;save()" placeholder="CCB<=50 こぶし&#10;1D6 ダメージ">${esc(x.commands)}</textarea>
+ <h3>🔒 KPメモ（駒には出力されません）</h3><textarea oninput="${p}.memo=this.value;save()">${esc(x.memo)}</textarea>
+ <div class="row"><button onclick="copyActor('${type}',${i})">ココフォリア駒をコピー</button><button class="secondary" onclick="copyActorText('${type}',${i})">確認用テキストをコピー</button></div></div>`;
+}
+function addActor(type){ensureActors();data.actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",armor:"",params:"",commands:"",memo:""});save();renderActors(document.getElementById("app"),type)}
+function deleteActor(type,i){if(confirm("削除しますか？")){data.actors[type].splice(i,1);save();renderActors(document.getElementById("app"),type)}}
+function parseParams(s){return (s||"").split(/\n/).map(v=>v.trim()).filter(Boolean).map(v=>{let m=v.match(/^(.+?)\s+(-?\d+(?:\.\d+)?)$/);return m?{label:m[1],value:Number(m[2])}:null}).filter(Boolean)}
+function actorJSON(x){
+ let status=[]; if(x.hp!=="")status.push({label:"HP",value:Number(x.hp)||0,max:Number(x.hp)||0}); if(x.mp!=="")status.push({label:"MP",value:Number(x.mp)||0,max:Number(x.mp)||0});
+ return {kind:"character",data:{name:x.name||"NPC",memo:"",initiative:Number(x.dex)||0,status,params:parseParams(x.params),active:true,secret:false,invisible:false,hideStatus:false,color:"#ffffff",commands:x.commands||""}};
+}
+function copyActor(type,i){navigator.clipboard.writeText(JSON.stringify(actorJSON(data.actors[type][i]))).then(()=>alert("ココフォリア駒データをコピーしました")).catch(()=>legacyCopy(JSON.stringify(actorJSON(data.actors[type][i]))))}
+function copyActorText(type,i){let x=data.actors[type][i];legacyCopy(`【${x.name}】\nHP:${x.hp} MP:${x.mp} DEX:${x.dex} 装甲:${x.armor}\n${x.params}\n${x.commands}`)}
+function legacyCopy(text){let t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();alert("コピーしました")}
+function renderPrep(a){
+ ensureActors();
+ a.innerHTML=`<div class="card"><h2>🏗️ ココフォリア事前準備</h2><p class="muted">シナリオの各シーンとNPC/敵を、登録順に処理できます。チェック状態も保存されます。</p></div>
+ ${data.scenes.map((s,i)=>{let done=!!data.prep["s"+i];return `<div class="card"><div class="row between"><h3>Scene ${i+1}：${esc(s.title)}</h3><label><input type="checkbox" ${done?"checked":""} onchange="data.prep.s${i}=this.checked;save()"> 登録済み</label></div><button onclick="legacyCopy(${JSON.stringify((s.body||"")+(s.info?"\n\n"+s.info:""))})">本文＋公開情報をコピー</button></div>`}).join("")}
+ <div class="card"><h3>👤 NPC / 👹 敵</h3>${["npc","enemy"].flatMap(type=>data.actors[type].map((x,i)=>`<div class="row between" style="margin:7px 0"><span>${type==="npc"?"👤":"👹"} ${esc(x.name)}</span><button onclick="copyActor('${type}',${i})">駒データをコピー</button></div>`)).join("")}</div>`;
+}
+function exportData(){let blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(data.title||"coc-kp")+".json";a.click();URL.revokeObjectURL(a.href)}
+function importData(file){if(!file)return;let r=new FileReader();r.onload=()=>{try{data=JSON.parse(r.result);save();render("scenes");alert("復元しました")}catch(e){alert("JSONが正しくありません")}};r.readAsText(file)}
+ensureActors(); save(); showTab("scenes");
+</script>
+</body></html>
