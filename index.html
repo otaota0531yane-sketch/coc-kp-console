@@ -119,7 +119,7 @@ function home(c){
  <div class="grid"><div class="card"><h3>▤ シナリオ</h3><p class="muted small">本文・描写・公開情報・KP情報をシーン単位で整理。</p><button class="btn" onclick="show('scenes')">シーンを見る</button></div>
  <div class="card"><h3>✦ KP情報</h3><p class="muted small">回すときに必要な重要情報を独立して確認。</p><button class="btn" onclick="show('kp')">KP情報を見る</button></div>
  <div class="card"><h3>♙ キャラクター</h3><p class="muted small">URLを登録してすぐ開けるようにします。</p><button class="btn" onclick="show('pc')">キャラシを見る</button></div>
- <div class="card"><h3>▣ PDF</h3><p class="muted small">文章を端末内で読み取り、シーンへ整理。</p><button class="btn" onclick="show('pdf')">PDFを読み込む</button></div></div>
+ <div class="card"><h3>▣ PDF</h3><p class="muted small">本文・画像内の文字・枠内の文字を読み取り、シーンへ整理。</p><button class="btn" onclick="show('pdf')">PDFを読み込む</button></div></div>
  <div class="card"><h3>運用の流れ</h3><div class="row"><span class="badge">01 シナリオ</span> → <span class="badge">02 PDF</span> → <span class="badge">03 整理</span> → <span class="badge">04 KP情報</span> → <span class="badge">05 ココフォリア用にコピー</span></div></div>
  <p class="footer-note">シナリオデータはこの端末のブラウザ内に保存されます。本文を外部サービスへ送信する機能はありません。</p>`
 }
@@ -221,45 +221,107 @@ function copyActor(type,i){
  copyText(text)
 }
 function pdf(c){
- const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">SCENARIO PDF</div><h2>PDF</h2><p class="muted">PDFはこの端末内で処理します。本文を外部サービスへ送信する処理はありません。</p>
- <div class="file"><input id="pdfFile" type="file" accept="application/pdf"><p class="small muted">文字情報を含むPDFを選択してください。</p><progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div></div></div>
- <div class="list">${s.pdfs.map((p,i)=>`<div class="item"><div class="row between"><div><span class="title">${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div><div class="row"><button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">シーンに整理</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div></div></div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`
+ const s=current();
+ c.innerHTML=`<div class="card">
+  <div class="eyebrow">SCENARIO PDF</div><h2>PDF読み込み</h2>
+  <p class="muted">PDFの文字・画像内の文字・枠で囲まれた文字を、この端末内で読み取ります。PDF本文を外部サービスへ送信する処理はありません。</p>
+  <div class="file">
+   <input id="pdfFile" type="file" accept="application/pdf">
+   <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+    <input id="pdfOcr" type="checkbox" checked style="width:auto">
+    <span>画像・図・スキャン・枠内の文字もOCRする</span>
+   </label>
+   <p class="small muted">通常のPDF文字は高精度に抽出し、OCRを有効にすると画像化されたページや画像内の文字も追加で認識します。長いPDFほど時間がかかります。</p>
+   <progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div>
+  </div></div>
+  <div class="list">${s.pdfs.map((p,i)=>`<div class="item">
+   <div class="row between"><div><span class="title">${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div>
+   <div class="row"><button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button>
+   <button class="btn" onclick="pdfToScenes(${i})">シーンに整理</button>
+   <button class="btn danger" onclick="delPDF(${i})">削除</button></div></div></div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
  document.getElementById("pdfFile").onchange=readPDF;
 }
+
+async function loadPDFjs(){
+ if(window.pdfjsLib)return window.pdfjsLib;
+ // The module is loaded dynamically so normal app use does not depend on PDF.js.
+ const mod=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+ mod.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+ window.pdfjsLib=mod;
+ return mod;
+}
+
 async function readPDF(e){
- const f=e.target.files?.[0];if(!f)return;const st=document.getElementById("pdfStatus"),pr=document.getElementById("prog");pr.hidden=false;st.textContent="PDFを読み込んでいます…";
+ const f=e.target.files?.[0];if(!f)return;
+ const st=document.getElementById("pdfStatus"),pr=document.getElementById("prog"),ocrOn=document.getElementById("pdfOcr")?.checked!==false;
+ pr.hidden=false;pr.value=0;st.textContent="PDFを読み込んでいます…";
  try{
-  const bytes=new Uint8Array(await f.arrayBuffer());const text=await extractPDFText(bytes,(a)=>{pr.value=a;st.textContent=`PDFを解析中… ${Math.round(a*100)}%`});
-  if(!text.trim())throw Error("no text");
-  const pages=text.pages;current().pdfs.push({name:f.name,pages:pages.length,text:pages.map((x,i)=>`【${i+1}ページ】\n${x}`).join("\n\n")});save();st.textContent=`読み込み完了：${pages.length}ページ`;render()
- }catch(err){console.error(err);st.textContent="文字情報を抽出できませんでした。画像だけのPDFや特殊なPDFは、本文を手動で貼り付けてください。"}
+  const bytes=new Uint8Array(await f.arrayBuffer());
+  const result=await extractPDFWithPDFJS(bytes,ocrOn,(a,msg)=>{pr.value=a;st.textContent=msg});
+  if(!result.pages.length)throw Error("no pages");
+  current().pdfs.push({
+   name:f.name,
+   pages:result.pages.length,
+   text:result.pages.map((x,i)=>`【${i+1}ページ】\n${x}`).join("\n\n"),
+   pageData:result.pageData||[]
+  });
+  save();st.textContent=`読み込み完了：${result.pages.length}ページ / ${result.pages.join("\n").length.toLocaleString()}文字`;render();
+ }catch(err){
+  console.error(err);
+  st.textContent="PDFを読み込めませんでした。PDF形式やブラウザの対応状況を確認してください。";
+ }
 }
-async function extractPDFText(bytes,progress){
- const raw=new TextDecoder("latin1").decode(bytes);let chunks=[];
- const re=/stream\r?\n([\s\S]*?)\r?\nendstream/g;let m;while((m=re.exec(raw))){
-   let obj=m[0],stream=m[1], decoded=stream;
-   if(/\/FlateDecode/.test(raw.slice(Math.max(0,m.index-1200),m.index))){
-     try{const b=new Uint8Array(stream.length);for(let i=0;i<stream.length;i++)b[i]=stream.charCodeAt(i)&255;
-       if("DecompressionStream" in window){const ds=new DecompressionStream("deflate");const ab=await new Response(new Blob([b]).stream().pipeThrough(ds)).arrayBuffer();decoded=new TextDecoder("latin1").decode(new Uint8Array(ab))}
-     }catch(e){}
+
+async function extractPDFWithPDFJS(bytes,doOCR,progress){
+ const pdfjs=await loadPDFjs();
+ const pdf=await pdfjs.getDocument({data:bytes}).promise;
+ const pages=[],pageData=[];
+ let worker=null;
+ if(doOCR){
+  if(!window.Tesseract)throw Error("OCR library unavailable");
+  progress(0.02,"OCRエンジンを準備しています…");
+  worker=await Tesseract.createWorker("jpn+eng",1,{
+    logger:m=>{
+      if(m.status==="recognizing text"){
+        const pct=Number(m.progress||0);
+        progress(Math.min(.98,(pageData.length+(pct))/pdf.numPages),"OCR中…");
+      }
+    }
+  });
+ }
+ try{
+  for(let n=1;n<=pdf.numPages;n++){
+   progress((n-1)/pdf.numPages,`PDFを解析中… ${n}/${pdf.numPages}ページ`);
+   const page=await pdf.getPage(n);
+   const tc=await page.getTextContent();
+   const text=tc.items.map(x=>x.str).join(" ").replace(/[ \t]+\n/g,"\n").trim();
+   let combined=text;
+   let ocr="";
+   if(doOCR){
+    const viewport=page.getViewport({scale:1.6});
+    const canvas=document.createElement("canvas");
+    const ctx=canvas.getContext("2d",{willReadFrequently:true});
+    canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    await page.render({canvasContext:ctx,viewport}).promise;
+    const r=await worker.recognize(canvas);
+    ocr=(r.data?.text||"").trim();
+    // Avoid doubling ordinary PDF text; OCR is primarily used to catch image/boxed text.
+    if(ocr && text){
+      const norm=a=>a.replace(/\s+/g,"").replace(/[「」『』【】（）()［］\[\]：:、,。．.]/g,"").toLowerCase();
+      const a=norm(text),b=norm(ocr);
+      combined=b.length>0 && (a.length<80 || b.length>a.length*1.15) ? `${text}\n\n【画像・図・枠内OCR】\n${ocr}` : text;
+    }else combined=ocr||text;
+    canvas.width=canvas.height=1;
    }
-   if(decoded.includes("Tj")||decoded.includes("TJ"))chunks.push(decoded);
+   pages.push(combined||"（このページから文字を抽出できませんでした）");
+   pageData.push({page:n,text:combined||"",hasOCR:!!ocr});
+  }
+ }finally{
+  if(worker)await worker.terminate();
  }
- if(!chunks.length)chunks=[raw];
- const pages=[];let cur=[];let seen=0;
- for(const ch of chunks){
-   const txt=[];
-   const rx=/\(((?:\\.|[^\\)])*)\)\s*Tj/g;let q;
-   while((q=rx.exec(ch)))txt.push(decodePDFString(q[1]));
-   const tj=/\[((?:[^\]]|\](?!\s*TJ))*)\]\s*TJ/g;
-   while((q=tj.exec(ch))){for(const z of q[1].match(/\((?:\\.|[^\\)])*\)/g)||[])txt.push(decodePDFString(z.slice(1,-1)))}
-   if(txt.length){cur.push(txt.join(" "));seen++;if(/BT[\s\S]*?ET/.test(ch)&&cur.length>0){pages.push(cur.join("\n"));cur=[]}}
-   progress(Math.min(.95,seen/Math.max(chunks.length,1)))
- }
- if(cur.length)pages.push(cur.join("\n"));if(!pages.length)pages.push(chunks.map(x=>x.replace(/[^\x20-\x7e\u3000-\u9fff]+/g," ")).join("\n"));
- return {pages}
+ progress(1,"読み込み完了");
+ return {pages,pageData};
 }
-function decodePDFString(s){return s.replace(/\\([\\()])/g,"$1").replace(/\\n/g,"\n").replace(/\\r/g,"\r").replace(/\\t/g,"\t").replace(/\\([0-7]{1,3})/g,(_,o)=>String.fromCharCode(parseInt(o,8)))}
 function pdfToScenes(i){const p=current().pdfs[i],blocks=p.text.split(/\n{2,}(?=【\d+ページ】)/).filter(Boolean);blocks.forEach((b,n)=>{const m=b.match(/^【(\d+)ページ】\n?([\s\S]*)$/);current().scenes.push({title:`PDF ${m?m[1]:n+1}ページ`,body:m?m[2]:b,info:"",kp:""})});save();show("scenes")}
 function delPDF(i){if(confirm("このPDF情報を削除しますか？")){current().pdfs.splice(i,1);save();render()}}
 function prep(c){
