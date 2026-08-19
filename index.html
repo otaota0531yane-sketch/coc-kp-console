@@ -18,6 +18,10 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}
 .brand{padding:4px 10px 22px}.brand b{font-size:18px;letter-spacing:.08em}.brand small{display:block;color:var(--muted);margin-top:5px}
 .nav{display:grid;gap:5px}.nav button{background:transparent;border:1px solid transparent;color:#aebed1;text-align:left;border-radius:10px;padding:10px 12px}.nav button.active{background:#122943;border-color:#20456b;color:#fff}.nav button:hover{background:#102238}
 .navBtn{display:flex;align-items:center;gap:10px;width:100%}
+.sceneList{display:grid;gap:10px}.sceneCard{background:#0d1b2a;border:1px solid #213a50;border-radius:14px;padding:14px 16px}.sceneCard h3{margin:0 0 4px}.sceneNo{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#162b3e;color:#9ed5ff;font-weight:700}.scenePreview{margin-top:12px;display:grid;gap:7px;color:#b9c8d6;font-size:13px}.scenePreview>div{display:flex;gap:8px;line-height:1.5}.sceneTag{display:inline-flex;align-items:center;justify-content:center;min-width:48px;height:22px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:700;flex:none}.bodyTag{background:#173a59;color:#a9d9ff}.infoTag{background:#173d32;color:#a8e5ca}.kpTag{background:#452832;color:#ffc0c7}.sceneEditGrid{display:grid;grid-template-columns:1fr;gap:12px}.sceneArea{min-height:300px}.sceneBody{border-color:#28577d}.sceneInfo{border-color:#2b6855}.sceneKP{border-color:#6c3040}.pdfItem{padding:14px}.previewActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #213a50}.pdfPages{display:grid;gap:12px}.pdfPage{background:#0d1b2a;border:1px solid #293e52;border-radius:14px;padding:14px}.pageLabel{font-size:11px;font-weight:800;letter-spacing:.12em;color:#9ed5ff}.pdfPreviewText{width:100%;min-height:360px;margin:10px 0;resize:vertical;background:#f7f7f3;color:#17212b;border:1px solid #c9d0d6;font-family:inherit;line-height:1.7}.pdfPreviewText:focus{outline:2px solid #6aa4d0;outline-offset:1px}
+@media(min-width:900px){.sceneEditGrid{grid-template-columns:1.4fr 1fr 1fr}.sceneArea{min-height:420px}}
+@media(max-width:820px){.sceneCard .row.between{align-items:flex-start;gap:8px}.sceneCard .row.between>.row{flex-wrap:wrap;justify-content:flex-end}.previewActions{position:sticky;top:0;z-index:5;background:#0b1622;padding:10px 0}.pdfPreviewText{min-height:420px}}
+
 .navIcon{display:inline-flex;align-items:center;justify-content:center;width:22px;min-width:22px;font-size:17px;line-height:1}
 .navText{display:inline}
 
@@ -81,7 +85,7 @@ function init(){
  if(!store.scenarios?.length){const s=blankScenario();store.scenarios=[s];store.currentId=s.id}
  for(const s of store.scenarios){s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};s.actors.npc??=[];s.actors.enemy??=[];
    for(const type of ["npc","enemy"]){for(const a of s.actors[type]){a.name??=type==="npc"?"NPC":"敵";a.hp??="";a.mp??="";a.dex??="";a.params??="";a.skills??="";a.commands??="";a.setting??="";a.memo??=""}}
-   s.pdfs??=[];s.prep??={}}
+   s.pdfs??=[];for(const p of s.pdfs){if(!Array.isArray(p.pageData)&&p.text)p.pageData=getPDFPages(p)}s.prep??={}}
  save();drawNav();drawScenario();render()
 }
 function drawNav(){
@@ -141,18 +145,43 @@ function home(c){
  <p class="footer-note">シナリオデータはこの端末のブラウザ内に保存されます。本文を外部サービスへ送信する機能はありません。</p>`
 }
 function scenes(c){
- const s=current();c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENES</div><h2>シナリオ</h2></div><button class="btn" onclick="addScene()">＋ 新しいシーン</button></div></div>
- <div class="list">${s.scenes.map((x,i)=>`<div class="item"><div class="row between"><div><span class="badge">${String(i+1).padStart(2,"0")}</span> <span class="title">${esc(x.title)}</span></div><div class="row"><button class="btn ghost" onclick="openScene(${i})">開く</button><button class="btn danger" onclick="delScene(${i})">削除</button></div></div><div class="meta">${x.kp?'KP情報あり':'KP情報なし'}　${x.info?'公開情報あり':''}</div></div>`).join("")||`<div class="empty">シーンがまだありません。</div>`}</div>`
+ const s=current();
+ c.innerHTML=`<div class="card">
+  <div class="row between"><div><div class="eyebrow">SCENES</div><h2>シーン</h2><p class="muted small">本文・公開情報・KP情報を分けて管理。長文でも一覧から内容を確認できます。</p></div><button class="btn" onclick="addScene()">＋ 新しいシーン</button></div>
+ </div>
+ <div class="sceneList">${s.scenes.map((x,i)=>`<div class="sceneCard">
+  <div class="row between"><div class="row"><span class="sceneNo">${String(i+1).padStart(2,"0")}</span><div><h3>${esc(x.title)}</h3><div class="meta">${x.body?`本文 ${x.body.length.toLocaleString()}字`:"本文なし"}　${x.info?`公開情報あり`:""}　${x.kp?`KP情報あり`:""}</div></div></div>
+  <div class="row"><button class="btn ghost" onclick="openScene(${i})">開く</button><button class="btn danger" onclick="delScene(${i})">削除</button></div></div>
+  <div class="scenePreview">
+   ${x.body?`<div><span class="sceneTag bodyTag">本文</span><span>${esc(x.body.slice(0,180))}${x.body.length>180?"…":""}</span></div>`:""}
+   ${x.info?`<div><span class="sceneTag infoTag">公開</span><span>${esc(x.info.slice(0,120))}${x.info.length>120?"…":""}</span></div>`:""}
+   ${x.kp?`<div><span class="sceneTag kpTag">KP</span><span>${esc(x.kp.slice(0,120))}${x.kp.length>120?"…":""}</span></div>`:""}
+  </div>
+ </div>`).join("")||`<div class="empty">シーンがまだありません。</div>`}</div>`
 }
 function addScene(){current().scenes.push({title:"新しいシーン",body:"",info:"",kp:""});save();show("scenes");}
 function delScene(i){if(confirm("このシーンを削除しますか？")){current().scenes.splice(i,1);save();render()}}
 function openScene(i){
- const x=current().scenes[i];document.getElementById("content").innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENE ${i+1}</div><h2>シーン編集</h2></div><button class="btn ghost" onclick="show('scenes')">← 一覧</button></div>
- <label>タイトル</label><input value="${esc(x.title)}" oninput="current().scenes[${i}].title=this.value;save()">
- <label>本文・描写</label><textarea oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea>
- <label>PLへ公開する情報</label><textarea oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea>
- <label>KPだけが見る情報</label><textarea oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea>
- <div class="row"><button class="btn" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">本文＋公開情報をコピー</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div>`
+ const x=current().scenes[i];
+ document.getElementById("content").innerHTML=`<div class="card">
+  <div class="row between"><div><div class="eyebrow">SCENE ${i+1}</div><h2>シーン編集</h2></div><button class="btn ghost" onclick="show('scenes')">← 一覧</button></div>
+  <label>タイトル</label><input value="${esc(x.title)}" oninput="current().scenes[${i}].title=this.value;save()">
+ </div>
+ <div class="sceneEditGrid">
+  <div class="card sceneBody"><div class="row between"><h3>本文・描写</h3><span class="sceneTag bodyTag">本文</span></div>
+   <textarea class="sceneArea" oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea>
+   <button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">本文をコピー</button>
+  </div>
+  <div class="card sceneInfo"><div class="row between"><h3>PLへ公開する情報</h3><span class="sceneTag infoTag">公開</span></div>
+   <textarea class="sceneArea" oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea>
+   <button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">公開情報をコピー</button>
+  </div>
+  <div class="card sceneKP"><div class="row between"><h3>KPだけが見る情報</h3><span class="sceneTag kpTag">KP</span></div>
+   <textarea class="sceneArea" oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea>
+   <button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button>
+  </div>
+ </div>
+ <div class="card"><div class="row"><button class="btn" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">本文＋公開情報をコピー</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info+'\\n\\n'+current().scenes[${i}].kp)">全部コピー</button></div></div>`
 }
 function kp(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">KEEPER NOTES</div><div class="row between"><h2>KP情報</h2><button class="btn" onclick="copyText(current().kpInfo)">KP情報をコピー</button></div>
@@ -241,24 +270,64 @@ function pdf(c){
  const s=current();
  c.innerHTML=`<div class="card">
   <div class="eyebrow">SCENARIO PDF</div><h2>PDF読み込み</h2>
-  <p class="muted">PDFの文字・画像内の文字・枠で囲まれた文字を、この端末内で読み取ります。PDF本文を外部サービスへ送信する処理はありません。</p>
+  <p class="muted">PDFを読み込んだあと、プレビューでページごとの文章を確認できます。必要な範囲だけ選択して、本文・公開情報・KP情報へ取り込めます。</p>
   <div class="file">
    <input id="pdfFile" type="file" accept="application/pdf">
-   <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
-    <input id="pdfOcr" type="checkbox" checked style="width:auto">
-    <span>画像・図・スキャン・枠内の文字もOCRする</span>
-   </label>
-   <p class="small muted">通常のPDF文字は高精度に抽出し、OCRを有効にすると画像化されたページや画像内の文字も追加で認識します。長いPDFほど時間がかかります。</p>
+   <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="pdfOcr" type="checkbox" checked style="width:auto"><span>画像・図・スキャン・枠内の文字もOCRする</span></label>
+   <p class="small muted">OCRをONにすると、画像化された文字も認識します。長いPDFほど時間がかかります。</p>
    <progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div>
-  </div></div>
-  <div class="list">${s.pdfs.map((p,i)=>`<div class="item">
-   <div class="row between"><div><span class="title">${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div>
-   <div class="row"><button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button>
-   <button class="btn" onclick="pdfToScenes(${i})">シーンに整理</button>
-   <button class="btn danger" onclick="delPDF(${i})">削除</button></div></div></div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
+  </div>
+ </div>
+ <div class="list">${s.pdfs.map((p,i)=>`<div class="item pdfItem">
+  <div class="row between"><div><span class="title">▣ ${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div>
+   <div class="row"><button class="btn" onclick="previewPDF(${i})">プレビュー</button><button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
+  </div>
+ </div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
  document.getElementById("pdfFile").onchange=readPDF;
 }
 
+function getPDFPages(p){
+ if(Array.isArray(p.pageData)&&p.pageData.length)return p.pageData.map(x=>({page:x.page,text:x.text||""}));
+ const chunks=String(p.text||"").split(/\n\n(?=【\d+ページ】)/).filter(Boolean);
+ return chunks.map((x,i)=>{const m=x.match(/^【(\d+)ページ】\n?([\s\S]*)$/);return {page:m?Number(m[1]):i+1,text:m?m[2]:x}});
+}
+
+function previewPDF(i){
+ const p=current().pdfs[i],pages=getPDFPages(p);
+ const c=document.getElementById("content");
+ c.innerHTML=`<div class="card">
+  <div class="row between"><div><div class="eyebrow">PDF PREVIEW</div><h2>${esc(p.name)}</h2><p class="muted small">ページごとに必要な部分を選択して取り込めます。iPhone/iPadでは文章を長押しして範囲選択できます。</p></div><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div>
+  <div class="previewActions"><span class="muted small">選択範囲：</span><button class="btn" onclick="appendSelectedPDF(${i},'body')">本文へ追加</button><button class="btn" onclick="appendSelectedPDF(${i},'info')">公開情報へ追加</button><button class="btn" onclick="appendSelectedPDF(${i},'kp')">KP情報へ追加</button><button class="btn ghost" onclick="copySelectedPDF()">選択範囲をコピー</button></div>
+ </div>
+ <div class="pdfPages">${pages.map((x,n)=>`<div class="pdfPage">
+  <div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,"0")}</span><span class="muted small">このページだけ取り込む</span></div>
+  <textarea id="pdfPreview_${i}_${n}" class="pdfPreviewText" readonly>${esc(x.text)}</textarea>
+  <div class="row"><button class="btn ghost" onclick="appendWholePDFPage(${i},${n},'body')">このページ→本文</button><button class="btn ghost" onclick="appendWholePDFPage(${i},${n},'info')">このページ→公開</button><button class="btn ghost" onclick="appendWholePDFPage(${i},${n},'kp')">このページ→KP</button></div>
+ </div>`).join("")}</div>`;
+}
+
+function selectedPDFText(){
+ const el=document.activeElement;
+ if(!el||!el.classList.contains("pdfPreviewText"))return "";
+ const a=el.selectionStart??0,b=el.selectionEnd??0;
+ return a===b?el.value:el.value.slice(a,b);
+}
+function copySelectedPDF(){const t=selectedPDFText();if(!t)return toast("PDFプレビューで範囲を選択してください");copyText(t)}
+function appendSelectedPDF(pdfIndex,field){
+ const t=selectedPDFText();if(!t)return toast("PDFプレビューで範囲を選択してください");
+ const s=current(),label={body:"本文",info:"公開情報",kp:"KP情報"}[field],i=prompt(`どのシーンの${label}へ追加しますか？\n番号を入力（1〜${s.scenes.length}）`,String(s.scenes.length||1));
+ const n=Number(i)-1;
+ if(!Number.isInteger(n)||n<0||n>=s.scenes.length)return;
+ s.scenes[n][field]=(s.scenes[n][field]?s.scenes[n][field]+"\\n\\n":"")+t;save();toast(`シーン${n+1}の${label}へ追加しました`);
+}
+function appendWholePDFPage(pdfIndex,pageIndex,field){
+ const p=current().pdfs[pdfIndex],pages=getPDFPages(p),t=pages[pageIndex]?.text||"";
+ if(!t)return;
+ const s=current(),label={body:"本文",info:"公開情報",kp:"KP情報"}[field],i=prompt(`どのシーンの${label}へ追加しますか？\n番号を入力（1〜${s.scenes.length}）`,String(s.scenes.length||1));
+ const n=Number(i)-1;
+ if(!Number.isInteger(n)||n<0||n>=s.scenes.length)return;
+ s.scenes[n][field]=(s.scenes[n][field]?s.scenes[n][field]+"\\n\\n":"")+t;save();toast(`ページ${pages[pageIndex].page}をシーン${n+1}の${label}へ追加しました`);
+}
 async function loadPDFjs(){
  if(window.pdfjsLib)return window.pdfjsLib;
  // The module is loaded dynamically so normal app use does not depend on PDF.js.
