@@ -4,152 +4,211 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
-<title>CoC KP Console v4</title>
+<title>CoC KP Console v5</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;background:#f4f5f7;color:#111827}
 header{position:sticky;top:0;z-index:5;background:#111827;color:#fff;padding:12px 14px;box-shadow:0 2px 8px #0002}
 header h1{font-size:18px;margin:0 0 8px}.tabs{display:flex;gap:6px;overflow:auto}.tabs button{white-space:nowrap;border:0;border-radius:10px;padding:9px 11px;background:#374151;color:#fff}
-.tabs button.active{background:#fff;color:#111827}.wrap{max-width:900px;margin:auto;padding:12px}.card{background:#fff;border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 1px 5px #0001}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+.tabs button.active{background:#fff;color:#111827}.wrap{max-width:900px;margin:auto;padding:12px}.card{background:#fff;border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 1px 5px #0001}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
 input,textarea,select{width:100%;border:1px solid #d1d5db;border-radius:9px;padding:10px;font:inherit;background:#fff}textarea{min-height:130px;resize:vertical}
-button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font:inherit}.secondary{background:#6b7280}.danger{background:#dc2626}.muted{color:#6b7280}.small{font-size:12px}.ok{color:#15803d}.warn{color:#b45309}.copytext{white-space:pre-wrap;background:#f3f4f6;padding:10px;border-radius:9px;max-height:280px;overflow:auto}
+button{border:0;border-radius:9px;padding:10px 13px;background:#2563eb;color:#fff;font:inherit}.secondary{background:#6b7280}.danger{background:#dc2626}.green{background:#15803d}
+.muted{color:#6b7280}.small{font-size:12px}.copytext{white-space:pre-wrap;background:#f3f4f6;padding:10px;border-radius:9px;max-height:280px;overflow:auto}
 label{display:block;margin:7px 0 4px;font-size:13px;font-weight:600}.file{padding:12px;border:2px dashed #cbd5e1;border-radius:12px}
 progress{width:100%;height:10px}h2,h3{margin:5px 0 9px}.empty{padding:20px;text-align:center;color:#6b7280}
+.scenarioBar{background:#fff;padding:10px 12px;border-bottom:1px solid #e5e7eb;display:flex;gap:8px;align-items:center}
+.scenarioBar select{flex:1;min-width:0}.pill{font-size:12px;background:#e5e7eb;border-radius:999px;padding:4px 8px}
+a.urlbtn{display:inline-block;text-decoration:none;color:#fff;background:#2563eb;border-radius:9px;padding:10px 13px}
 @media(min-width:700px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 </style>
 </head>
 <body>
-<header><h1>🎲 CoC KP Console v4</h1><div class="tabs" id="tabs"></div></header>
+<header><h1>🎲 CoC KP Console v5</h1><div class="tabs" id="tabs"></div></header>
+<div class="scenarioBar">
+  <span class="pill">シナリオ</span>
+  <select id="scenarioSelect" onchange="switchScenario(this.value)"></select>
+  <button onclick="newScenario()">＋新規</button>
+  <button class="danger" onclick="deleteCurrentScenario()">削除</button>
+</div>
 <main class="wrap" id="app"></main>
 
 <script>
-const KEY="coc_kp_console_v4";
-let data=load();
-function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-function load(){try{return Object.assign(defaultData(),JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){return defaultData()}}
-function defaultData(){return {scenes:[],hos:[],pcs:[],actors:{npc:[],enemy:[]},important:"",pdfImports:[],prep:{}}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data))}
-function ensure(){data.scenes ||= [];data.hos ||= [];data.pcs ||= [];data.actors ||= {npc:[],enemy:[]};data.actors.npc ||= [];data.actors.enemy ||= [];data.pdfImports ||= [];data.prep ||= {}}
+const KEY="coc_kp_console_v5";
+const oldKeys=["coc_kp_console_v4","coc_kp_console_v4_fixed","coc_kp_console_v3"];
+let store=loadStore();
+let currentTab="home";
+
+function emptyScenario(name="新しいシナリオ"){
+ return {id:crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random()),name,
+  scenes:[],hos:[],pcs:[],actors:{npc:[],enemy:[]},important:"",pdfImports:[],prep:{}};
+}
+function defaultStore(){const s=emptyScenario("新しいシナリオ");return {scenarios:[s],currentId:s.id}}
+function loadStore(){
+ try{
+  const x=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(x?.scenarios?.length) return x;
+ }catch(e){}
+ // Migrate the simple v4 data format if present.
+ for(const k of oldKeys){
+  try{
+   const old=JSON.parse(localStorage.getItem(k)||"null");
+   if(old && (old.scenes||old.hos||old.pcs||old.actors)){
+    const s=emptyScenario("移行したシナリオ");
+    Object.assign(s,{scenes:old.scenes||[],hos:old.hos||[],pcs:old.pcs||[],actors:old.actors||{npc:[],enemy:[]},important:old.important||"",pdfImports:old.pdfImports||[],prep:old.prep||{}});
+    return {scenarios:[s],currentId:s.id};
+   }
+  }catch(e){}
+ }
+ return defaultStore();
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(store))}
+function cur(){return store.scenarios.find(s=>s.id===store.currentId)||store.scenarios[0]}
+function ensure(){
+ if(!store.scenarios?.length){const s=emptyScenario();store.scenarios=[s];store.currentId=s.id}
+ for(const s of store.scenarios){s.scenes ||= [];s.hos ||= [];s.pcs ||= [];s.actors ||= {npc:[],enemy:[]};s.actors.npc ||= [];s.actors.enemy ||= [];s.pdfImports ||= [];s.prep ||= {}}
+ if(!cur())store.currentId=store.scenarios[0].id;
+}
 ensure();save();
 
 const tabs=[
  ["home","🏠 ホーム"],["scenes","📖 シナリオ"],["ho","🔒 HO"],["pc","🎲 キャラシ"],
- ["npc","👤 NPC"],["enemy","👹 敵"],["prep","🏗️ 準備"],["pdf","📄 PDF"]
+ ["npc","👤 NPC"],["enemy","👹 敵"],["prep","🏗️ 準備"],["pdf","📄 PDF"],["backup","💾 保存"]
 ];
-let current="home";
-function drawTabs(){document.getElementById("tabs").innerHTML=tabs.map(([id,t])=>`<button class="${id===current?"active":""}" onclick="showTab('${id}')">${t}</button>`).join("")}
-function showTab(t){current=t;drawTabs();render()}
-function render(){ensure();let a=document.getElementById("app");({home:renderHome,scenes:renderScenes,ho:renderHO,pc:renderPC,npc:renderActors,enemy:renderActors,prep:renderPrep,pdf:renderPDF}[current])(a,current)}
+
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function drawTabs(){
+ document.getElementById("tabs").innerHTML=tabs.map(([id,t])=>`<button class="${id===currentTab?"active":""}" onclick="showTab('${id}')">${t}</button>`).join("");
+ const sel=document.getElementById("scenarioSelect");
+ sel.innerHTML=store.scenarios.map(s=>`<option value="${esc(s.id)}" ${s.id===store.currentId?"selected":""}>${esc(s.name)}</option>`).join("");
+}
+function showTab(t){currentTab=t;drawTabs();render()}
+function render(){
+ ensure();const a=document.getElementById("app");
+ ({home:renderHome,scenes:renderScenes,ho:renderHO,pc:renderPC,npc:renderActors,enemy:renderActors,prep:renderPrep,pdf:renderPDF,backup:renderBackup}[currentTab])(a,currentTab);
+}
+function newScenario(){
+ const name=prompt("シナリオ名を入力してください","新しいシナリオ");
+ if(!name)return;
+ const s=emptyScenario(name.trim());store.scenarios.push(s);store.currentId=s.id;save();currentTab="home";drawTabs();render();
+}
+function switchScenario(id){if(store.scenarios.some(s=>s.id===id)){store.currentId=id;save();render()}}
+function deleteCurrentScenario(){
+ if(store.scenarios.length===1){alert("最後の1件は削除できません。");return}
+ const s=cur();if(!confirm(`「${s.name}」を削除しますか？\\nこのシナリオの本文・秘匿・キャラシ等も削除されます。`))return;
+ store.scenarios=store.scenarios.filter(x=>x.id!==s.id);store.currentId=store.scenarios[0].id;save();currentTab="home";drawTabs();render();
+}
+function renameScenario(){
+ const s=cur(),name=prompt("シナリオ名",s.name);if(name?.trim()){s.name=name.trim();save();drawTabs();render()}
+}
 function renderHome(a){
-a.innerHTML=`<div class="card"><h2>CoC KP Console</h2><p>長編シナリオをスマホから準備・運用するためのローカル管理ツール。</p>
-<div class="grid"><button onclick="showTab('pdf')">📄 PDFを読み込む</button><button onclick="showTab('scenes')">📖 シーン管理</button><button onclick="showTab('pc')">🎲 キャラシ</button><button onclick="showTab('prep')">🏗️ 準備</button></div></div>
-<div class="card"><h3>🔐 データについて</h3><p class="small muted">シナリオ本文・秘匿・キャラシ等はこのブラウザのlocalStorageに保存します。GitHubには保存しません。</p>
-<div class="row"><button onclick="exportData()">バックアップ</button><button class="secondary" onclick="importData()">復元</button></div></div>`
+ const s=cur();
+ a.innerHTML=`<div class="card"><div class="row between"><h2>🎲 ${esc(s.name)}</h2><button class="secondary" onclick="renameScenario()">名前変更</button></div>
+ <p>このシナリオ専用の本文・KP情報・HO・キャラシ・NPC・敵・PDFをまとめて管理できます。</p>
+ <div class="grid"><button onclick="showTab('pdf')">📄 PDFを読み込む</button><button onclick="showTab('scenes')">📖 シーン管理</button><button onclick="showTab('pc')">🎲 キャラシ</button><button onclick="showTab('prep')">🏗️ 準備</button></div></div>
+ <div class="card"><h3>このシナリオの内容</h3><p>シーン ${s.scenes.length}　／　HO ${s.hos.length}　／　キャラシ ${s.pcs.length}　／　NPC ${s.actors.npc.length}　／　敵 ${s.actors.enemy.length}　／　PDF ${s.pdfImports.length}</p>
+ <p class="small muted">データはシナリオごとに分離して、この端末のブラウザ内に保存されます。</p></div>`;
 }
 function renderScenes(a){
-a.innerHTML=`<div class="card"><h2>📖 シナリオ</h2><button onclick="addScene()">＋シーン追加</button></div>
-${data.scenes.map((s,i)=>`<div class="card"><div class="row between"><h3>Scene ${i+1}：${esc(s.title)}</h3><button class="danger" onclick="delScene(${i})">削除</button></div>
-<label>タイトル</label><input value="${esc(s.title)}" oninput="data.scenes[${i}].title=this.value;save()">
-<label>本文・描写</label><textarea oninput="data.scenes[${i}].body=this.value;save()">${esc(s.body)}</textarea>
-<label>PL公開情報</label><textarea oninput="data.scenes[${i}].info=this.value;save()">${esc(s.info)}</textarea>
-<label>🔒 KP情報</label><textarea oninput="data.scenes[${i}].kp=this.value;save()">${esc(s.kp)}</textarea>
-<button onclick="copyText((data.scenes[${i}].body||'')+'\\n\\n'+(data.scenes[${i}].info||''))">本文＋公開情報をコピー</button></div>`).join("")||`<div class="card empty">まだシーンがありません。</div>`}`
+ const s=cur();
+ a.innerHTML=`<div class="card"><h2>📖 シナリオ</h2><button onclick="addScene()">＋シーン追加</button></div>
+ ${s.scenes.map((x,i)=>`<div class="card"><div class="row between"><h3>Scene ${i+1}：${esc(x.title)}</h3><button class="danger" onclick="delScene(${i})">削除</button></div>
+ <label>タイトル</label><input value="${esc(x.title)}" oninput="cur().scenes[${i}].title=this.value;save();drawTabs()">
+ <label>本文・描写</label><textarea oninput="cur().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea>
+ <label>PL公開情報</label><textarea oninput="cur().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea>
+ <label>🔒 KP情報</label><textarea oninput="cur().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea>
+ <button onclick="copyText((cur().scenes[${i}].body||'')+'\\n\\n'+(cur().scenes[${i}].info||''))">本文＋公開情報をコピー</button></div>`).join("")||`<div class="card empty">まだシーンがありません。</div>`}`;
 }
-function addScene(){data.scenes.push({title:"新しいシーン",body:"",info:"",kp:""});save();render()}
-function delScene(i){if(confirm("削除しますか？")){data.scenes.splice(i,1);save();render()}}
+function addScene(){cur().scenes.push({title:"新しいシーン",body:"",info:"",kp:""});save();render()}
+function delScene(i){if(confirm("削除しますか？")){cur().scenes.splice(i,1);save();render()}}
 function renderHO(a){
-a.innerHTML=`<div class="card"><h2>🔒 HO・秘匿</h2><button onclick="addHO()">＋HO追加</button></div>
-${data.hos.map((h,i)=>`<div class="card"><div class="row between"><h3>${esc(h.name)}</h3><button class="danger" onclick="data.hos.splice(${i},1);save();render()">削除</button></div>
-<label>HO名</label><input value="${esc(h.name)}" oninput="data.hos[${i}].name=this.value;save()">
-<label>秘匿本文</label><textarea oninput="data.hos[${i}].secret=this.value;save()">${esc(h.secret)}</textarea>
-<label>KPメモ</label><textarea oninput="data.hos[${i}].memo=this.value;save()">${esc(h.memo)}</textarea>
-<button onclick="copyText(data.hos[${i}].secret)">秘匿をコピー</button></div>`).join("")||`<div class="card empty">まだHOがありません。</div>`}`
+ const s=cur();
+ a.innerHTML=`<div class="card"><h2>🔒 HO・秘匿</h2><button onclick="addHO()">＋HO追加</button></div>
+ ${s.hos.map((h,i)=>`<div class="card"><div class="row between"><h3>${esc(h.name)}</h3><button class="danger" onclick="cur().hos.splice(${i},1);save();render()">削除</button></div>
+ <label>HO名</label><input value="${esc(h.name)}" oninput="cur().hos[${i}].name=this.value;save()">
+ <label>秘匿本文</label><textarea oninput="cur().hos[${i}].secret=this.value;save()">${esc(h.secret)}</textarea>
+ <label>KPメモ</label><textarea oninput="cur().hos[${i}].memo=this.value;save()">${esc(h.memo)}</textarea>
+ <button onclick="copyText(cur().hos[${i}].secret)">秘匿をコピー</button></div>`).join("")||`<div class="card empty">まだHOがありません。</div>`}`;
 }
-function addHO(){data.hos.push({name:"HO1",secret:"",memo:""});save();render()}
+function addHO(){cur().hos.push({name:"HO1",secret:"",memo:""});save();render()}
 function renderPC(a){
-a.innerHTML=`<div class="card"><h2>🎲 キャラクターシート</h2>
-<label>いあきゃら公開URL</label><div class="row"><input id="iacharaUrl" placeholder="https://iachara.com/view/1234567"><button onclick="importIachara()">読み込む</button></div>
-<p class="small muted">いあきゃら側の公開ページがブラウザから取得できる場合は自動登録します。取得がCORSで拒否された場合は、URLを保存して手動貼り付けに切り替えられます。</p></div>
-${data.pcs.map((p,i)=>`<div class="card"><div class="row between"><h3>${esc(p.name||"キャラクター")}</h3><button class="danger" onclick="data.pcs.splice(${i},1);save();render()">削除</button></div>
-<p class="small muted">出典：${esc(p.source||"手動")}</p><textarea oninput="data.pcs[${i}].summary=this.value;save()">${esc(p.summary)}</textarea><button onclick="copyText(data.pcs[${i}].summary)">キャラシ情報をコピー</button></div>`).join("")||`<div class="card empty">まだキャラシがありません。</div>`}`
+ const s=cur();
+ a.innerHTML=`<div class="card"><h2>🎲 キャラクターシート</h2>
+ <p class="muted">いあきゃらから自動取得は行わず、URLを保存していつでも開けるようにします。</p>
+ <button onclick="addPC()">＋キャラシ追加</button></div>
+ ${s.pcs.map((p,i)=>`<div class="card"><div class="row between"><h3>${esc(p.name||"キャラクター")}</h3><button class="danger" onclick="cur().pcs.splice(${i},1);save();render()">削除</button></div>
+ <label>キャラクター名</label><input value="${esc(p.name)}" oninput="cur().pcs[${i}].name=this.value;save()">
+ <label>いあきゃらURL</label><input value="${esc(p.url||"")}" placeholder="https://iachara.com/..." oninput="cur().pcs[${i}].url=this.value;save()">
+ <div class="row">${p.url?`<a class="urlbtn" href="${esc(p.url)}" target="_blank" rel="noopener">いあきゃらを開く</a>`:""}<button class="secondary" onclick="copyText(cur().pcs[${i}].summary||'')">メモをコピー</button></div>
+ <label>KP確認用メモ・キャラシ情報</label><textarea oninput="cur().pcs[${i}].summary=this.value;save()">${esc(p.summary||"")}</textarea></div>`).join("")||`<div class="card empty">まだキャラシがありません。</div>`}`;
 }
-async function importIachara(){
-const u=document.getElementById("iacharaUrl").value.trim();
-if(!/^https?:\/\/(www\.)?iachara\.com\//i.test(u)){alert("いあきゃらの公開URLを入力してください。");return}
-try{
- const r=await fetch(u,{mode:"cors",credentials:"omit"}); const text=await r.text();
- const doc=new DOMParser().parseFromString(text,"text/html"); const body=(doc.body?.innerText||"").trim();
- if(!body) throw Error("empty");
- const name=(doc.querySelector("h1")?.textContent||doc.title||"いあきゃらキャラクター").trim();
- data.pcs.push({name,source:u,summary:body.slice(0,20000)});save();render();alert("読み込みました。");
-}catch(e){
- data.pcs.push({name:"いあきゃら（URL保存）",source:u,summary:"URLから自動取得できませんでした。いあきゃらの公開ページを開いて、キャラシ本文をここへ貼り付けてください。"});save();render();
- alert("いあきゃらのページをブラウザから直接取得できませんでした。URLは保存しました。これはサイト側のCORS制限によるものです。");
-}}
+function addPC(){cur().pcs.push({name:"新しいPC",url:"",summary:""});save();render()}
 function renderActors(a,type){
-const label=type==="npc"?"NPC":"敵";
-a.innerHTML=`<div class="card"><h2>${type==="npc"?"👤":"👹"} ${label}</h2><p class="muted">画像はココフォリア側で設定します。</p><button onclick="addActor('${type}')">＋${label}追加</button></div>
-${data.actors[type].map((x,i)=>actorCard(type,x,i)).join("")||`<div class="card empty">まだ${label}がありません。</div>`}`
+ const s=cur(),label=type==="npc"?"NPC":"敵";
+ a.innerHTML=`<div class="card"><h2>${type==="npc"?"👤":"👹"} ${label}</h2><p class="muted">画像はココフォリア側で設定します。</p><button onclick="addActor('${type}')">＋${label}追加</button></div>
+ ${s.actors[type].map((x,i)=>actorCard(type,x,i)).join("")||`<div class="card empty">まだ${label}がありません。</div>`}`;
 }
 function actorCard(type,x,i){
-let p=`data.actors.${type}[${i}]`;
-return `<div class="card"><div class="row between"><h3>${esc(x.name)}</h3><button class="danger" onclick="data.actors.${type}.splice(${i},1);save();render()">削除</button></div>
-<label>名前</label><input value="${esc(x.name)}" oninput="${p}.name=this.value;save()"><div class="grid">
-<div><label>HP</label><input value="${esc(x.hp)}" oninput="${p}.hp=this.value;save()"></div><div><label>MP</label><input value="${esc(x.mp)}" oninput="${p}.mp=this.value;save()"></div><div><label>DEX</label><input value="${esc(x.dex)}" oninput="${p}.dex=this.value;save()"></div><div><label>装甲</label><input value="${esc(x.armor)}" oninput="${p}.armor=this.value;save()"></div></div>
-<label>能力値</label><textarea oninput="${p}.params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15&#10;SIZ 11&#10;INT 14&#10;EDU 16">${esc(x.params)}</textarea>
-<label>攻撃・技能・チャットパレット</label><textarea oninput="${p}.commands=this.value;save()" placeholder="CCB<=50 こぶし&#10;1D6 ダメージ">${esc(x.commands)}</textarea>
-<label>🔒 KPメモ（駒には出力しません）</label><textarea oninput="${p}.memo=this.value;save()">${esc(x.memo)}</textarea>
-<button onclick="copyActor('${type}',${i})">ココフォリア駒をコピー</button></div>`
+ const p=`cur().actors.${type}[${i}]`;
+ return `<div class="card"><div class="row between"><h3>${esc(x.name)}</h3><button class="danger" onclick="cur().actors.${type}.splice(${i},1);save();render()">削除</button></div>
+ <label>名前</label><input value="${esc(x.name)}" oninput="${p}.name=this.value;save()"><div class="grid">
+ <div><label>HP</label><input value="${esc(x.hp)}" oninput="${p}.hp=this.value;save()"></div><div><label>MP</label><input value="${esc(x.mp)}" oninput="${p}.mp=this.value;save()"></div><div><label>DEX</label><input value="${esc(x.dex)}" oninput="${p}.dex=this.value;save()"></div><div><label>装甲</label><input value="${esc(x.armor)}" oninput="${p}.armor=this.value;save()"></div></div>
+ <label>能力値</label><textarea oninput="${p}.params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15">${esc(x.params)}</textarea>
+ <label>攻撃・技能・チャットパレット</label><textarea oninput="${p}.commands=this.value;save()" placeholder="CCB<=50 こぶし&#10;1D6 ダメージ">${esc(x.commands)}</textarea>
+ <label>🔒 KPメモ</label><textarea oninput="${p}.memo=this.value;save()">${esc(x.memo)}</textarea>
+ <button onclick="copyActor('${type}',${i})">ココフォリア駒をコピー</button></div>`;
 }
-function addActor(type){data.actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",armor:"",params:"",commands:"",memo:""});save();render()}
-function parseParams(s){return (s||"").split(/\\n/).map(v=>v.trim()).filter(Boolean).map(v=>{let m=v.match(/^(.+?)\\s+(-?\\d+(?:\\.\\d+)?)$/);return m?{label:m[1],value:Number(m[2])}:null}).filter(Boolean)}
-function actorJSON(x){return {kind:"character",data:{name:x.name||"NPC",memo:"",initiative:Number(x.dex)||0,status:[...(x.hp? [{label:"HP",value:Number(x.hp)||0,max:Number(x.hp)||0}]:[]),...(x.mp? [{label:"MP",value:Number(x.mp)||0,max:Number(x.mp)||0}]:[])],params:parseParams(x.params),active:true,secret:false,invisible:false,hideStatus:false,commands:x.commands||""}}}
-function copyActor(type,i){copyText(JSON.stringify(actorJSON(data.actors[type][i])))}
+function addActor(type){cur().actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",armor:"",params:"",commands:"",memo:""});save();render()}
+function parseParams(str){return (str||"").split(/\n/).map(v=>v.trim()).filter(Boolean).map(v=>{const m=v.match(/^(.+?)\s+(-?\d+(?:\.\d+)?)$/);return m?{label:m[1],value:Number(m[2])}:null}).filter(Boolean)}
+function actorJSON(x){return {kind:"character",data:{name:x.name||"NPC",memo:"",initiative:Number(x.dex)||0,status:[...(x.hp?[{label:"HP",value:Number(x.hp)||0,max:Number(x.hp)||0}]:[]),...(x.mp?[{label:"MP",value:Number(x.mp)||0,max:Number(x.mp)||0}]:[])],params:parseParams(x.params),active:true,secret:false,invisible:false,hideStatus:false,commands:x.commands||""}}}
+function copyActor(type,i){copyText(JSON.stringify(actorJSON(cur().actors[type][i])))}
 function renderPrep(a){
-a.innerHTML=`<div class="card"><h2>🏗️ ココフォリア準備</h2><p class="muted">シーン、NPC、敵を順番に登録できます。チェック状態はこの端末に保存されます。</p></div>
-${data.scenes.map((s,i)=>`<div class="card"><div class="row between"><h3>Scene ${i+1}：${esc(s.title)}</h3><label><input type="checkbox" ${data.prep["s"+i]?"checked":""} onchange="data.prep.s${i}=this.checked;save()"> 登録済み</label></div><button onclick="copyText((data.scenes[${i}].body||'')+'\\n\\n'+(data.scenes[${i}].info||''))">本文＋公開情報をコピー</button></div>`).join("")}
-<div class="card"><h3>駒</h3>${["npc","enemy"].flatMap(t=>data.actors[t].map((x,i)=>`<div class="row between"><span>${t==="npc"?"👤":"👹"} ${esc(x.name)}</span><button onclick="copyActor('${t}',${i})">駒JSONをコピー</button></div>`)).join("")||"<p class='muted'>なし</p>"}</div>`
+ const s=cur();
+ a.innerHTML=`<div class="card"><h2>🏗️ ココフォリア準備</h2><p class="muted">このシナリオの登録状況をまとめて確認できます。</p></div>
+ ${s.scenes.map((x,i)=>`<div class="card"><div class="row between"><h3>Scene ${i+1}：${esc(x.title)}</h3><label><input type="checkbox" ${s.prep["s"+i]?"checked":""} onchange="cur().prep.s${i}=this.checked;save()"> 登録済み</label></div><button onclick="copyText((cur().scenes[${i}].body||'')+'\\n\\n'+(cur().scenes[${i}].info||''))">本文＋公開情報をコピー</button></div>`).join("")}
+ <div class="card"><h3>駒</h3>${["npc","enemy"].flatMap(t=>s.actors[t].map((x,i)=>`<div class="row between"><span>${t==="npc"?"👤":"👹"} ${esc(x.name)}</span><button onclick="copyActor('${t}',${i})">駒JSONをコピー</button></div>`)).join("")||"<p class='muted'>なし</p>"}</div>`;
 }
 function renderPDF(a){
-a.innerHTML=`<div class="card"><h2>📄 シナリオPDF読み込み</h2>
-<p>購入したPDFをこのiPhone上で選択し、文字情報を抽出します。PDF自体はGitHubへアップロードしません。</p>
-<div class="file"><input id="pdfFile" type="file" accept="application/pdf"></div>
-<div id="pdfStatus" class="small muted"></div><progress id="pdfProgress" value="0" max="1" hidden></progress></div>
-<div id="pdfResult"></div>
-${data.pdfImports.map((p,i)=>`<div class="card"><div class="row between"><h3>${esc(p.name)}</h3><button class="danger" onclick="data.pdfImports.splice(${i},1);save();render()">削除</button></div><p class="small muted">${p.pages}ページ</p><button onclick="copyText(data.pdfImports[${i}].text)">抽出全文をコピー</button></div>`).join("")}`;
-document.getElementById("pdfFile").onchange=handlePDF;
+ const s=cur();
+ a.innerHTML=`<div class="card"><h2>📄 シナリオPDF読み込み</h2>
+ <p>PDFをこのiPhone上で選択し、文字情報を抽出します。PDF自体はGitHubへアップロードしません。</p>
+ <div class="file"><input id="pdfFile" type="file" accept="application/pdf"></div><div id="pdfStatus" class="small muted"></div>
+ <progress id="pdfProgress" value="0" max="1" hidden></progress></div>
+ <div id="pdfResult"></div>
+ ${s.pdfImports.map((p,i)=>`<div class="card"><div class="row between"><h3>${esc(p.name)}</h3><button class="danger" onclick="cur().pdfImports.splice(${i},1);save();render()">削除</button></div>
+ <p class="small muted">${p.pages}ページ</p><button onclick="copyText(cur().pdfImports[${i}].text)">抽出全文をコピー</button><button class="secondary" onclick="makeScenesFromPDF(${i})">ページごとにシーン化</button></div>`).join("")||""}`;
+ document.getElementById("pdfFile").onchange=handlePDF;
 }
 async function handlePDF(e){
-const f=e.target.files?.[0];if(!f)return;
-const status=document.getElementById("pdfStatus"),prog=document.getElementById("pdfProgress");
-status.textContent="PDFを解析中…";prog.hidden=false;
-try{
- const pdf=await loadPDFJS(f);let pages=[];
- for(let n=1;n<=pdf.numPages;n++){
-  status.textContent=`PDFを解析中… ${n}/${pdf.numPages}ページ`;prog.value=n/pdf.numPages;
-  const page=await pdf.getPage(n),c=await page.getTextContent();
-  pages.push(`【${n}ページ】\\n`+c.items.map(x=>x.str||"").join(" ").replace(/\\s+/g," ").trim());
- }
- const text=pages.join("\\n\\n");data.pdfImports.push({name:f.name,pages:pdf.numPages,text});save();
- status.textContent=`読み込み完了：${pdf.numPages}ページ`;
- renderPDF(document.getElementById("app"));
- alert("PDFの文字抽出が完了しました。");
-}catch(err){console.error(err);status.textContent="読み込みに失敗しました。文字情報がない画像PDFは別途OCRが必要です。"}
+ const f=e.target.files?.[0];if(!f)return;
+ const status=document.getElementById("pdfStatus"),prog=document.getElementById("pdfProgress");status.textContent="PDFを解析中…";prog.hidden=false;
+ try{
+  const mod=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
+  mod.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+  const pdf=await mod.getDocument({data:await f.arrayBuffer()}).promise;let pages=[];
+  for(let n=1;n<=pdf.numPages;n++){status.textContent=`PDFを解析中… ${n}/${pdf.numPages}ページ`;prog.value=n/pdf.numPages;const page=await pdf.getPage(n),c=await page.getTextContent();pages.push(`【${n}ページ】\n`+c.items.map(x=>x.str||"").join(" ").replace(/\s+/g," ").trim())}
+  cur().pdfImports.push({name:f.name,pages:pdf.numPages,text:pages.join("\n\n")});save();status.textContent=`読み込み完了：${pdf.numPages}ページ`;renderPDF(document.getElementById("app"));
+ }catch(err){console.error(err);status.textContent="読み込みに失敗しました。画像だけのPDFは文字抽出できません。"}
 }
-async function loadPDFJS(file){
- // Lazy-load PDF.js from a CDN only when the user selects a PDF.
- const mod=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");
- mod.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
- return mod.getDocument({data:await file.arrayBuffer()}).promise;
+function makeScenesFromPDF(i){
+ const p=cur().pdfImports[i];const blocks=p.text.split(/\n{2,}(?=【\d+ページ】)/).filter(Boolean);
+ blocks.forEach(b=>{const m=b.match(/^【(\d+)ページ】\n?([\s\S]*)$/);cur().scenes.push({title:`PDF ${m?m[1]:""}ページ`,body:m?m[2]:b,info:"",kp:""})});
+ save();alert(`${blocks.length}ページ分をシーンとして追加しました。`);showTab("scenes");
+}
+function renderBackup(a){
+ a.innerHTML=`<div class="card"><h2>💾 シナリオデータ保存</h2><p>現在のシナリオだけをJSONでバックアップ・復元できます。</p>
+ <button onclick="exportCurrent()">現在のシナリオをバックアップ</button><button class="secondary" onclick="importCurrent()">現在のシナリオを復元</button></div>
+ <div class="card"><h3>シナリオ一覧</h3>${store.scenarios.map(s=>`<div class="row between"><span>${esc(s.name)}</span><span class="small muted">Scene ${s.scenes.length} / HO ${s.hos.length} / PC ${s.pcs.length}</span></div>`).join("")}</div>`;
+}
+function exportCurrent(){
+ const blob=new Blob([JSON.stringify(cur(),null,2)],{type:"application/json"}),u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=(cur().name.replace(/[\\/:*?"<>|]/g,"_")||"scenario")+".json";a.click();setTimeout(()=>URL.revokeObjectURL(u),500)
+}
+function importCurrent(){
+ const i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=()=>{const f=i.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.name)throw Error();x.id=cur().id;store.scenarios[store.scenarios.findIndex(s=>s.id===cur().id)]=x;ensure();save();render();alert("復元しました")}catch(e){alert("シナリオJSONを読み込めませんでした")}};r.readAsText(f)};i.click()
 }
 function copyText(text){
-if(navigator.clipboard?.writeText)navigator.clipboard.writeText(String(text)).then(()=>alert("コピーしました。")).catch(()=>legacyCopy(text));
-else legacyCopy(text)}
-function legacyCopy(text){const t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();alert("コピーしました。")}
-function exportData(){
-const b=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="coc-kp-backup.json";a.click();URL.revokeObjectURL(u)}
-function importData(){
-const i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=()=>{const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{data=Object.assign(defaultData(),JSON.parse(r.result));ensure();save();render();alert("復元しました。")}catch(e){alert("JSONを読み込めませんでした。")}};r.readAsText(f)};i.click()
+ const s=String(text??"");if(navigator.clipboard?.writeText){navigator.clipboard.writeText(s).then(()=>alert("コピーしました")).catch(()=>legacyCopy(s))}else legacyCopy(s)
 }
+function legacyCopy(text){const t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();document.execCommand("copy");t.remove();alert("コピーしました")}
 drawTabs();render();
 </script>
 </body>
