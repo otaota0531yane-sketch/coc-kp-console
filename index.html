@@ -34,7 +34,7 @@ label{font-size:12px;color:#aabbd0;font-weight:700;display:block;margin:9px 0 5p
 .file{border:1px dashed #385572;border-radius:12px;padding:14px;background:#0a1726}.notice{border-left:3px solid var(--accent);padding:9px 11px;background:#0b1b2c;color:#b7c8da;border-radius:7px;font-size:12px}
 .empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}.hidden{display:none!important}
 a.link{color:#7fc5ff}.footer-note{font-size:11px;color:#71859c;margin-top:18px}
-@media(max-width:820px){.sidebar{width:68px;padding:14px 8px}.brand b{font-size:0}.brand b:after{content:"✦";font-size:22px}.brand small{display:none}.nav button{font-size:0;text-align:center;padding:11px 4px}.nav button:first-letter{font-size:18px}.sidebottom{display:none}.content{padding:14px}.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:820px){.sidebar{width:68px;padding:14px 8px}.brand b{font-size:0}.brand b:after{content:"✦";font-size:22px}.brand small{display:none}.nav button{font-size:0;text-align:center;padding:11px 4px}.nav .navIcon{font-size:18px;display:block}.nav .navText{display:none}.sidebottom{display:none}.content{padding:14px}.stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.grid,.grid3{grid-template-columns:1fr}.topbar{padding:10px}.scenarioSelect{max-width:none}.hero h1{font-size:23px}}
 </style>
 </head>
@@ -57,7 +57,7 @@ a.link{color:#7fc5ff}.footer-note{font-size:11px;color:#71859c;margin-top:18px}
 const KEY="kp_console_v6";
 const NAV=[
  ["home","⌂","ホーム"],["scenes","▤","シナリオ"],["kp","✦","KP情報"],["ho","◇","HO・秘匿"],
- ["pc","♙","キャラクター"],["npc","♧","NPC"],["enemy","⚔","敵"],["pdf","▣","PDF"],
+ ["pc","♙","PC・キャラクター"],["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],
  ["prep","✓","準備"]
 ];
 let store=load();
@@ -72,17 +72,39 @@ function current(){return store.scenarios.find(s=>s.id===store.currentId)||store
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function init(){
  if(!store.scenarios?.length){const s=blankScenario();store.scenarios=[s];store.currentId=s.id}
- for(const s of store.scenarios){s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};s.actors.npc??=[];s.actors.enemy??=[];s.pdfs??=[];s.prep??={}}
+ for(const s of store.scenarios){s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};s.actors.npc??=[];s.actors.enemy??=[];
+   for(const type of ["npc","enemy"]){for(const a of s.actors[type]){a.name??=type==="npc"?"NPC":"敵";a.hp??="";a.mp??="";a.dex??="";a.params??="";a.skills??="";a.commands??="";a.setting??="";a.memo??=""}}
+   s.pdfs??=[];s.prep??={}}
  save();drawNav();drawScenario();render()
 }
 function drawNav(){document.getElementById("nav").innerHTML=NAV.map(n=>`<button class="${tab===n[0]?'active':''}" onclick="show('${n[0]}')">${n[1]} <span>${n[2]}</span></button>`).join("")}
 function drawScenario(){document.getElementById("scenarioSelect").innerHTML=store.scenarios.map(s=>`<option value="${esc(s.id)}" ${s.id===store.currentId?'selected':''}>${esc(s.name)}</option>`).join("")}
 function show(t){tab=t;drawNav();render()}
+function repairCurrentData(){
+ const s=current();
+ s.actors??={};s.actors.npc??=[];s.actors.enemy??=[];
+ for(const type of ["npc","enemy"]) for(const a of s.actors[type]){
+  a.name??=type==="npc"?"NPC":"敵";a.hp??="";a.mp??="";a.dex??="";a.params??="";a.skills??="";a.commands??="";a.setting??="";a.memo??="";
+ }
+ s.pcs??=[];s.hos??=[];s.scenes??=[];s.pdfs??=[];s.kpInfo??="";
+ save();drawScenario();
+}
 function switchScenario(id){if(store.scenarios.some(s=>s.id===id)){store.currentId=id;save();render()}}
 function newScenario(){const n=prompt("シナリオ名","新しいシナリオ");if(!n?.trim())return;const s=blankScenario(n.trim());store.scenarios.push(s);store.currentId=s.id;save();drawScenario();show("home")}
 function renameScenario(){const s=current(),n=prompt("シナリオ名",s.name);if(n?.trim()){s.name=n.trim();save();drawScenario();render()}}
 function deleteScenario(){if(store.scenarios.length===1)return alert("最後のシナリオは削除できません。");const s=current();if(!confirm(`「${s.name}」を削除しますか？`))return;store.scenarios=store.scenarios.filter(x=>x.id!==s.id);store.currentId=store.scenarios[0].id;save();drawScenario();show("home")}
-function render(){const c=document.getElementById("content"),fn={home:home,scenes:scenes,kp:kp,ho:ho,pc:pc,npc:actor,enemy:actor,pdf:pdf,prep:prep,backup:backup}[tab];fn(c)}
+function render(){
+ const c=document.getElementById("content");
+ const fn={home:home,scenes:scenes,kp:kp,ho:ho,pc:pc,npc:actor,enemy:actor,pdf:pdf,prep:prep,backup:backup}[tab];
+ if(!fn){tab="home";drawNav();return render()}
+ try{
+   if(tab==="npc"||tab==="enemy") fn(c,tab);
+   else fn(c);
+ }catch(err){
+   console.error(err);
+   c.innerHTML=`<div class="card"><h2>表示できませんでした</h2><p class="muted">このタブのデータに古い形式の項目がある可能性があります。ページを再読み込みして、もう一度開いてください。</p><button class="btn" onclick="repairCurrentData();render()">データを整える</button></div>`;
+ }
+}
 function home(c){
  const s=current();c.innerHTML=`<div class="card hero"><div class="eyebrow">CURRENT SCENARIO</div><div class="row between"><div><h1>${esc(s.name)}</h1><p class="muted">長編シナリオを、読む・整理する・使うをひとつの画面で。</p></div><button class="btn ghost" onclick="renameScenario()">✎ 名前変更</button></div>
  <div class="stats"><div class="stat"><span>シーン</span><b>${s.scenes.length}</b></div><div class="stat"><span>KP情報</span><b>${s.kpInfo?1:0}</b></div><div class="stat"><span>キャラクター</span><b>${s.pcs.length}</b></div><div class="stat"><span>PDF</span><b>${s.pdfs.length}</b></div></div></div>
@@ -130,23 +152,66 @@ function pc(c){
 }
 function addPC(){current().pcs.push({name:"新しいキャラクター",url:"",memo:""});save();render()}
 function actor(c,type){
- const s=current(),label=type==="npc"?"NPC":"敵",cls=type,icon=type==="npc"?"♧":"⚔";
- c.innerHTML=`<div class="card" style="border-color:${type==="npc"?"#2b6855":"#6c3040"}"><div class="row between"><div><div class="eyebrow">${label.toUpperCase()}</div><h2>${label}</h2><p class="muted small">駒用のステータスと、KP用の設定を分けて管理できます。</p></div><span class="badge ${cls}">${icon} ${label}</span></div>
- <button class="btn" onclick="addActor('${type}')">＋ ${label}追加</button></div>
- <div class="grid">${s.actors[type].map((x,i)=>`<div class="card" style="border-color:${type==="npc"?"#245443":"#5c2937"}"><div class="row between"><h3>${esc(x.name)}</h3><span class="badge ${cls}">${label}</span></div>
- <label>名前</label><input value="${esc(x.name)}" oninput="current().actors.${type}[${i}].name=this.value;save()">
- <h4 style="margin:16px 0 4px">駒のステータス</h4>
- <div class="grid3"><div><label>HP</label><input value="${esc(x.hp)}" oninput="current().actors.${type}[${i}].hp=this.value;save()"></div><div><label>MP</label><input value="${esc(x.mp)}" oninput="current().actors.${type}[${i}].mp=this.value;save()"></div><div><label>DEX</label><input value="${esc(x.dex)}" oninput="current().actors.${type}[${i}].dex=this.value;save()"></div></div>
- <label>能力値</label><textarea oninput="current().actors.${type}[${i}].params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15">${esc(x.params)}</textarea>
- <label>攻撃・技能・チャットパレット</label><textarea oninput="current().actors.${type}[${i}].commands=this.value;save()">${esc(x.commands)}</textarea>
- <h4 style="margin:16px 0 4px">KP用の設定・メモ</h4>
- <label>設定・背景</label><textarea oninput="current().actors.${type}[${i}].setting=this.value;save()" placeholder="人物像、背景、目的、秘密、登場時の様子など">${esc(x.setting||"")}</textarea>
- <label>KPメモ</label><textarea oninput="current().actors.${type}[${i}].memo=this.value;save()" placeholder="運用上の注意、出す情報、演出メモなど">${esc(x.memo)}</textarea>
- <div class="row"><button class="btn" onclick="copyActor('${type}',${i})">駒用データをコピー</button><button class="btn danger" onclick="delActor('${type}',${i})">削除</button></div></div>`).join("")||`<div class="empty">${label}がまだありません。</div>`}</div>`
-}
-function addActor(type){current().actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",params:"",commands:"",setting:"",memo:""});save();render()}
+ const s=current(),isNpc=type==="npc",label=isNpc?"NPC・登場人物":"敵・エネミー",icon=isNpc?"♧":"⚔",cls=isNpc?"npc":"enemy";
+ const border=isNpc?"#2b6855":"#6c3040",soft=isNpc?"#245443":"#5c2937";
+ c.innerHTML=`<div class="card" style="border-color:${border}">
+   <div class="row between">
+    <div><div class="eyebrow">${isNpc?"NPC / CHARACTERS":"ENEMIES"}</div>
+     <h2>${label}</h2>
+     <p class="muted small">${isNpc?"登場人物の駒データと、KP用の人物設定を管理します。":"戦闘用の駒データと、KP用の戦闘・演出メモを管理します。"}</p>
+    </div>
+    <span class="badge ${cls}">${icon} ${isNpc?"NPC":"敵"}</span>
+   </div>
+   <button class="btn" onclick="addActor('${type}')">＋ ${isNpc?"NPC・登場人物":"敵"}を追加</button>
+ </div>
+ <div class="grid">${s.actors[type].map((x,i)=>`<div class="card" style="border-color:${soft}">
+   <div class="row between"><h3>${esc(x.name)}</h3><span class="badge ${cls}">${isNpc?"NPC":"敵"}</span></div>
+   <label>名前</label><input value="${esc(x.name)}" oninput="current().actors.${type}[${i}].name=this.value;save()">
+
+   <h4 style="margin:16px 0 4px">駒のステータス</h4>
+   <div class="grid3">
+    <div><label>HP</label><input value="${esc(x.hp)}" oninput="current().actors.${type}[${i}].hp=this.value;save()"></div>
+    <div><label>MP</label><input value="${esc(x.mp)}" oninput="current().actors.${type}[${i}].mp=this.value;save()"></div>
+    <div><label>DEX</label><input value="${esc(x.dex)}" oninput="current().actors.${type}[${i}].dex=this.value;save()"></div>
+   </div>
+   <label>能力値</label>
+   <textarea oninput="current().actors.${type}[${i}].params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15">${esc(x.params)}</textarea>
+
+   <h4 style="margin:16px 0 4px">技能・攻撃</h4>
+   <label>技能</label>
+   <textarea oninput="current().actors.${type}[${i}].skills=this.value;save()" placeholder="目星 70&#10;聞き耳 65&#10;回避 50">${esc(x.skills)}</textarea>
+   <label>攻撃・チャットパレット</label>
+   <textarea oninput="current().actors.${type}[${i}].commands=this.value;save()" placeholder="こぶし 50% 1D3+DB&#10;回避 50%">${esc(x.commands)}</textarea>
+
+   <h4 style="margin:16px 0 4px">KP用メモ</h4>
+   <label>設定・背景</label>
+   <textarea oninput="current().actors.${type}[${i}].setting=this.value;save()" placeholder="${isNpc?"人物像、背景、目的、秘密、登場時の様子など":"正体、弱点、戦闘方針、演出、遭遇時の注意など"}">${esc(x.setting||"")}</textarea>
+   <label>KPメモ</label>
+   <textarea oninput="current().actors.${type}[${i}].memo=this.value;save()" placeholder="出す情報、演出メモ、運用上の注意など">${esc(x.memo)}</textarea>
+
+   <div class="row">
+    <button class="btn" onclick="copyActor('${type}',${i})">ココフォリア駒用データをコピー</button>
+    <button class="btn danger" onclick="delActor('${type}',${i})">削除</button>
+   </div>
+ </div>`).join("")||`<div class="empty">${isNpc?"NPC・登場人物":"敵・エネミー"}がまだありません。</div>`}</div>`
+}function addActor(type){current().actors[type]??=[];current().actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",params:"",skills:"",commands:"",setting:"",memo:""});save();render()}
 function delActor(type,i){if(confirm("削除しますか？")){current().actors[type].splice(i,1);save();render()}}
-function copyActor(type,i){const x=current().actors[type][i];copyText(JSON.stringify({name:x.name,hp:x.hp,mp:x.mp,dex:x.dex,params:x.params,commands:x.commands,setting:x.setting||''}))}
+function copyActor(type,i){
+ const x=current().actors[type][i], title=type==="npc"?"NPC":"敵";
+ const text=[
+  `【${title}】${x.name||""}`,
+  `HP: ${x.hp||""} / MP: ${x.mp||""} / DEX: ${x.dex||""}`,
+  "",
+  "【能力値】",x.params||"",
+  "",
+  "【技能】",x.skills||"",
+  "",
+  "【攻撃・チャットパレット】",x.commands||"",
+  "",
+  "【KP用設定・メモ】",x.setting||"",x.memo||""
+ ].join("\n");
+ copyText(text)
+}
 function pdf(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">SCENARIO PDF</div><h2>PDF</h2><p class="muted">PDFはこの端末内で処理します。本文を外部サービスへ送信する処理はありません。</p>
  <div class="file"><input id="pdfFile" type="file" accept="application/pdf"><p class="small muted">文字情報を含むPDFを選択してください。</p><progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div></div></div>
