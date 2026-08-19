@@ -74,7 +74,7 @@ ${data.pcs.map((p,i)=>`<div class="card"><div class="row between"><h3>${esc(p.na
 }
 async function importIachara(){
 const u=document.getElementById("iacharaUrl").value.trim();
-if(!/^https?:\\/\\/(www\\.)?iachara\\.com\\//i.test(u)){alert("いあきゃらの公開URLを入力してください。");return}
+if(!/^https?:\/\/(www\.)?iachara\.com\//i.test(u)){alert("いあきゃらの公開URLを入力してください。");return}
 try{
  const r=await fetch(u,{mode:"cors",credentials:"omit"}); const text=await r.text();
  const doc=new DOMParser().parseFromString(text,"text/html"); const body=(doc.body?.innerText||"").trim();
