@@ -30,7 +30,7 @@ label{font-size:12px;color:#aabbd0;font-weight:700;display:block;margin:9px 0 5p
 .btn{border:1px solid #2e6a9d;background:#145386;color:#fff;border-radius:10px;padding:9px 12px}.btn:hover{filter:brightness(1.12)}.btn.ghost{background:#0d1b2d;border-color:var(--line);color:#c4d1df}.btn.danger{background:#4a1c26;border-color:#71303d;color:#ffd8de}.btn.ok{background:#174c3b;border-color:#286b53}
 .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.between{justify-content:space-between}
 .list{display:grid;gap:8px}.item{padding:12px;border:1px solid var(--line);border-radius:11px;background:#0c192a}.item:hover{border-color:#315a7e}.item .title{font-weight:700}.item .meta{font-size:11px;color:var(--muted);margin-top:4px}
-.badge{font-size:10px;padding:3px 7px;border-radius:99px;background:#142a43;color:#9fcfff;border:1px solid #244b70}.badge.red{background:#321a22;color:#ffb4bf;border-color:#5d2b38}
+.badge.pc{background:#102b46;color:#9ed5ff;border-color:#28577d}.badge.npc{background:#12332b;color:#9ee1c1;border-color:#2b6855}.badge.enemy{background:#351b24;color:#ffb7c0;border-color:#6c3040}.badge{font-size:10px;padding:3px 7px;border-radius:99px;background:#142a43;color:#9fcfff;border:1px solid #244b70}.badge.red{background:#321a22;color:#ffb4bf;border-color:#5d2b38}
 .file{border:1px dashed #385572;border-radius:12px;padding:14px;background:#0a1726}.notice{border-left:3px solid var(--accent);padding:9px 11px;background:#0b1b2c;color:#b7c8da;border-radius:7px;font-size:12px}
 .empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}.hidden{display:none!important}
 a.link{color:#7fc5ff}.footer-note{font-size:11px;color:#71859c;margin-top:18px}
@@ -119,21 +119,34 @@ function ho(c){
 function addHO(){current().hos.push({name:`HO${current().hos.length+1}`,secret:"",memo:""});save();render()}
 function sDelete(type,i){if(confirm("削除しますか？")){current()[type].splice(i,1);save();render()}}
 function pc(c){
- const s=current();c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">CHARACTERS</div><h2>キャラクター</h2></div><button class="btn" onclick="addPC()">＋ キャラクター追加</button></div><div class="notice">登録したページはここから開くだけです。ページの内容をこのツールが取得することはありません。</div></div>
- <div class="grid">${s.pcs.map((p,i)=>`<div class="card"><div class="row between"><h3>${esc(p.name)}</h3><button class="btn danger" onclick="sDelete('pcs',${i})">削除</button></div>
- <label>キャラクター名</label><input value="${esc(p.name)}" oninput="current().pcs[${i}].name=this.value;save()"><label>ページURL</label><input value="${esc(p.url)}" placeholder="https://..." oninput="current().pcs[${i}].url=this.value;save()"><div class="row">${p.url?`<a class="link" href="${esc(p.url)}" target="_blank" rel="noopener">→ ページを開く</a>`:""} </div><label>KP確認メモ</label><textarea oninput="current().pcs[${i}].memo=this.value;save()">${esc(p.memo)}</textarea></div>`).join("")||`<div class="empty">キャラクターがまだありません。</div>`}</div>`
+ const s=current();c.innerHTML=`<div class="card" style="border-color:#28577d"><div class="eyebrow">CHARACTERS</div><div class="row between"><div><h2>キャラクター</h2><p class="muted small">キャラシのページURLを登録して、ここからすぐ開けます。</p></div><span class="badge pc">♙ キャラシ</span></div>
+ <div class="notice">いあきゃらのURLを貼り付けて保存できます。キャラシの内容をこのツールが取得することはありません。</div></div>
+ <div class="grid">${s.pcs.map((p,i)=>`<div class="card" style="border-color:#234e70"><div class="row between"><h3>${esc(p.name)}</h3><span class="badge pc">キャラクター</span></div>
+ <label>キャラクター名</label><input value="${esc(p.name)}" oninput="current().pcs[${i}].name=this.value;save()">
+ <label>いあきゃらのURL</label><input value="${esc(p.url)}" placeholder="https://..." oninput="current().pcs[${i}].url=this.value;save()">
+ <div class="row">${p.url?`<a class="link" href="${esc(p.url)}" target="_blank" rel="noopener">→ いあきゃらを開く</a>`:"<span class='muted small'>URLを登録すると、ここに開くボタンが表示されます。</span>"}</div>
+ <label>KP確認メモ</label><textarea oninput="current().pcs[${i}].memo=this.value;save()">${esc(p.memo)}</textarea>
+ <button class="btn danger" onclick="sDelete('pcs',${i})">削除</button></div>`).join("")||`<div class="empty">キャラクターがまだありません。</div>`}</div>`
 }
 function addPC(){current().pcs.push({name:"新しいキャラクター",url:"",memo:""});save();render()}
 function actor(c,type){
- const s=current(),label=type==="npc"?"NPC":"敵";c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">${label.toUpperCase()}</div><h2>${label}</h2></div><button class="btn" onclick="addActor('${type}')">＋ ${label}追加</button></div><p class="muted small">画像は登録せず、情報だけを管理。必要な駒データはコピーして使えます。</p></div>
- <div class="grid">${s.actors[type].map((x,i)=>`<div class="card"><div class="row between"><h3>${esc(x.name)}</h3><button class="btn danger" onclick="delActor('${type}',${i})">削除</button></div>
- <label>名前</label><input value="${esc(x.name)}" oninput="current().actors.${type}[${i}].name=this.value;save()"><div class="grid3"><div><label>HP</label><input value="${esc(x.hp)}" oninput="current().actors.${type}[${i}].hp=this.value;save()"></div><div><label>MP</label><input value="${esc(x.mp)}" oninput="current().actors.${type}[${i}].mp=this.value;save()"></div><div><label>DEX</label><input value="${esc(x.dex)}" oninput="current().actors.${type}[${i}].dex=this.value;save()"></div></div>
- <label>能力値</label><textarea oninput="current().actors.${type}[${i}].params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15">${esc(x.params)}</textarea><label>攻撃・技能・チャットパレット</label><textarea oninput="current().actors.${type}[${i}].commands=this.value;save()">${esc(x.commands)}</textarea><label>KPメモ</label><textarea oninput="current().actors.${type}[${i}].memo=this.value;save()">${esc(x.memo)}</textarea>
- <button class="btn" onclick="copyActor('${type}',${i})">ココフォリア用データをコピー</button></div>`).join("")||`<div class="empty">${label}がまだありません。</div>`}</div>`
+ const s=current(),label=type==="npc"?"NPC":"敵",cls=type,icon=type==="npc"?"♧":"⚔";
+ c.innerHTML=`<div class="card" style="border-color:${type==="npc"?"#2b6855":"#6c3040"}"><div class="row between"><div><div class="eyebrow">${label.toUpperCase()}</div><h2>${label}</h2><p class="muted small">駒用のステータスと、KP用の設定を分けて管理できます。</p></div><span class="badge ${cls}">${icon} ${label}</span></div>
+ <button class="btn" onclick="addActor('${type}')">＋ ${label}追加</button></div>
+ <div class="grid">${s.actors[type].map((x,i)=>`<div class="card" style="border-color:${type==="npc"?"#245443":"#5c2937"}"><div class="row between"><h3>${esc(x.name)}</h3><span class="badge ${cls}">${label}</span></div>
+ <label>名前</label><input value="${esc(x.name)}" oninput="current().actors.${type}[${i}].name=this.value;save()">
+ <h4 style="margin:16px 0 4px">駒のステータス</h4>
+ <div class="grid3"><div><label>HP</label><input value="${esc(x.hp)}" oninput="current().actors.${type}[${i}].hp=this.value;save()"></div><div><label>MP</label><input value="${esc(x.mp)}" oninput="current().actors.${type}[${i}].mp=this.value;save()"></div><div><label>DEX</label><input value="${esc(x.dex)}" oninput="current().actors.${type}[${i}].dex=this.value;save()"></div></div>
+ <label>能力値</label><textarea oninput="current().actors.${type}[${i}].params=this.value;save()" placeholder="STR 12&#10;CON 10&#10;POW 15">${esc(x.params)}</textarea>
+ <label>攻撃・技能・チャットパレット</label><textarea oninput="current().actors.${type}[${i}].commands=this.value;save()">${esc(x.commands)}</textarea>
+ <h4 style="margin:16px 0 4px">KP用の設定・メモ</h4>
+ <label>設定・背景</label><textarea oninput="current().actors.${type}[${i}].setting=this.value;save()" placeholder="人物像、背景、目的、秘密、登場時の様子など">${esc(x.setting||"")}</textarea>
+ <label>KPメモ</label><textarea oninput="current().actors.${type}[${i}].memo=this.value;save()" placeholder="運用上の注意、出す情報、演出メモなど">${esc(x.memo)}</textarea>
+ <div class="row"><button class="btn" onclick="copyActor('${type}',${i})">駒用データをコピー</button><button class="btn danger" onclick="delActor('${type}',${i})">削除</button></div></div>`).join("")||`<div class="empty">${label}がまだありません。</div>`}</div>`
 }
-function addActor(type){current().actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",params:"",commands:"",memo:""});save();render()}
+function addActor(type){current().actors[type].push({name:type==="npc"?"NPC":"敵",hp:"",mp:"",dex:"",params:"",commands:"",setting:"",memo:""});save();render()}
 function delActor(type,i){if(confirm("削除しますか？")){current().actors[type].splice(i,1);save();render()}}
-function copyActor(type,i){const x=current().actors[type][i];copyText(JSON.stringify({name:x.name,hp:x.hp,mp:x.mp,dex:x.dex,params:x.params,commands:x.commands}))}
+function copyActor(type,i){const x=current().actors[type][i];copyText(JSON.stringify({name:x.name,hp:x.hp,mp:x.mp,dex:x.dex,params:x.params,commands:x.commands,setting:x.setting||''}))}
 function pdf(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">SCENARIO PDF</div><h2>PDF</h2><p class="muted">PDFはこの端末内で処理します。本文を外部サービスへ送信する処理はありません。</p>
  <div class="file"><input id="pdfFile" type="file" accept="application/pdf"><p class="small muted">文字情報を含むPDFを選択してください。</p><progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div></div></div>
