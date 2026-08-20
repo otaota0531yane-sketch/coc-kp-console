@@ -152,6 +152,26 @@ input,select,textarea{max-width:100%}
 
 .pdfViewerModal{position:fixed;inset:0;z-index:200;background:rgba(2,8,15,.94);display:flex;flex-direction:column;padding:10px}.pdfViewerHead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 4px;color:#fff}.pdfViewerFrame{flex:1;width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}.paragraphList{display:grid;gap:10px}.paragraphCard{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(8,22,36,.6)}.paragraphHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;color:var(--muted);font-size:12px}.pdfParagraphText{width:100%;min-height:90px;resize:vertical;line-height:1.65;background:#0b1827;border:1px solid var(--line);border-radius:8px;color:#e9eef7;padding:10px}.fileBtn{display:inline-flex;align-items:center;cursor:pointer}.fileBtn input{display:none}
 @media(max-width:599px){.renameTopBtn{grid-column:1/-1}.pdfViewerHead{align-items:flex-start}.pdfViewerHead .row{flex-wrap:nowrap}.paragraphCard .row{gap:5px}.paragraphCard .btn{font-size:12px;padding:7px 8px}}
+
+/* v11 PDF original viewer */
+.pdfViewerModal{position:fixed;inset:0;z-index:9999;background:#07111d;display:flex;flex-direction:column;color:#eaf2ff}
+.pdfViewerHead{flex:0 0 auto;padding:10px 14px;border-bottom:1px solid #28425e;background:#0b1726;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pdfOriginalToolbar{flex:0 0 auto;padding:8px 14px;border-bottom:1px solid #20384f;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pdfOriginalPages{flex:1 1 auto;overflow:auto;padding:14px;display:flex;flex-direction:column;align-items:center;gap:16px}
+.originalPage{width:min(100%,900px);background:#111c29;border:1px solid #294764;border-radius:12px;padding:8px}
+.originalPageHead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 5px 8px;position:sticky;top:0;background:#111c29;z-index:2}
+.originalCanvasWrap{display:flex;justify-content:center;background:#253241;border-radius:8px;overflow:auto}
+.originalCanvasWrap canvas{display:block;background:white;max-width:100%;height:auto;box-shadow:0 2px 12px #0006}
+@media(max-width:599px){
+ .pdfViewerHead{align-items:flex-start;flex-direction:column;padding:9px}
+ .pdfViewerHead>.row{width:100%;overflow-x:auto;flex-wrap:nowrap}
+ .pdfViewerHead .btn{white-space:nowrap}
+ .pdfOriginalToolbar{padding:7px 9px}
+ .originalPage{width:100%;border-radius:8px}
+ .originalPageHead{align-items:flex-start;flex-direction:column}
+ .originalPageHead>.row{width:100%;overflow-x:auto;flex-wrap:nowrap}
+ .originalPageHead .btn{white-space:nowrap}
+}
 </style>
 </head>
 <body>
@@ -196,16 +216,54 @@ async function putPDFOriginal(id,file){try{const db=await openPDFDB();await new 
 async function getPDFOriginal(id){if(!id)return null;try{const db=await openPDFDB();const v=await new Promise((res,rej)=>{const tx=db.transaction("files","readonly");const r=tx.objectStore("files").get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)});db.close();return v}catch(e){return null}}
 async function deletePDFOriginal(id){if(!id)return;try{const db=await openPDFDB();await new Promise((res,rej)=>{const tx=db.transaction("files","readwrite");tx.objectStore("files").delete(id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}catch(e){}}
 async function openOriginalPDF(pdfIndex,sourceIndex=0){
- const p=current().pdfs[pdfIndex];const id=p?.originalIds?.[sourceIndex];const file=await getPDFOriginal(id);
+ const p=current().pdfs[pdfIndex],id=p?.originalIds?.[sourceIndex],file=await getPDFOriginal(id);
  if(!file){toast("このPDFの原本はこの端末に保存されていません。登録し直すと表示できます。");return}
- const url=URL.createObjectURL(file);showPDFViewer(url,file.name||p.name);setTimeout(()=>{},1000);
-}
-function showPDFViewer(url,name){
  let old=document.getElementById("pdfViewerModal");if(old)old.remove();
  const m=document.createElement("div");m.id="pdfViewerModal";m.className="pdfViewerModal";
- m.innerHTML=`<div class="pdfViewerHead"><b>${esc(name)}</b><div class="row"><a class="btn ghost" href="${url}" target="_blank" rel="noopener">別画面で開く</a><button class="btn" onclick="closePDFViewer()">閉じる</button></div></div><iframe class="pdfViewerFrame" src="${url}" title="PDFプレビュー"></iframe>`;
- m.dataset.url=url;document.body.appendChild(m);
+ m.innerHTML=`<div class="pdfViewerHead"><div><b>${esc(file.name||p.name)}</b><div class="small muted">原本をツール内で全ページ確認できます。ページを選んで抽出することもできます。</div></div><div class="row"><button class="btn" onclick="extractSelectedOriginalPages(${pdfIndex},${sourceIndex},false)">選択ページを抽出</button><button class="btn ghost" onclick="extractSelectedOriginalPages(${pdfIndex},${sourceIndex},true)">選択ページをOCR抽出</button><button class="btn ghost" onclick="closePDFViewer()">閉じる</button></div></div>
+ <div class="pdfOriginalToolbar"><span id="pdfOriginalStatus">読み込み中…</span><button class="btn ghost" onclick="selectAllOriginalPages(true)">全ページ選択</button><button class="btn ghost" onclick="selectAllOriginalPages(false)">選択解除</button></div><div id="pdfOriginalPages" class="pdfOriginalPages"></div>`;
+ m.dataset.pdfIndex=pdfIndex;m.dataset.sourceIndex=sourceIndex;
+ document.body.appendChild(m);
+ const url=URL.createObjectURL(file);m.dataset.url=url;
+ try{
+  const pdfjs=await loadPDFjs(),doc=await pdfjs.getDocument({url}).promise,wrap=m.querySelector("#pdfOriginalPages");
+  for(let n=1;n<=doc.numPages;n++){
+   const holder=document.createElement("section");holder.className="originalPage";holder.dataset.page=n;
+   holder.innerHTML=`<div class="originalPageHead"><label><input class="originalPageCheck" type="checkbox" checked> <b>PAGE ${n}</b></label><div class="row"><button class="btn ghost" onclick="extractOneOriginalPage(${pdfIndex},${sourceIndex},${n},false)">このページを抽出</button><button class="btn ghost" onclick="extractOneOriginalPage(${pdfIndex},${sourceIndex},${n},true)">OCR</button></div></div><div class="originalCanvasWrap"><canvas></canvas></div>`;
+   wrap.appendChild(holder);
+   const page=await doc.getPage(n),vp=page.getViewport({scale:Math.min(1.5,(wrap.clientWidth-20)/page.getViewport({scale:1}).width)});
+   const canvas=holder.querySelector("canvas");canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);
+   await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
+   m.querySelector("#pdfOriginalStatus").textContent=`${n} / ${doc.numPages}ページ`;
+  }
+  m.querySelector("#pdfOriginalStatus").textContent=`全${doc.numPages}ページ表示`;
+ }catch(e){console.error(e);m.querySelector("#pdfOriginalStatus").textContent="PDFを表示できませんでした。"}
 }
+function selectAllOriginalPages(v){document.querySelectorAll("#pdfOriginalPages .originalPageCheck").forEach(x=>x.checked=v)}
+async function extractOneOriginalPage(pdfIndex,sourceIndex,pageNo,ocr){
+ const p=current().pdfs[pdfIndex],id=p?.originalIds?.[sourceIndex],file=await getPDFOriginal(id);if(!file)return;
+ const bytes=new Uint8Array(await file.arrayBuffer()),r=await extractPDFWithPDFJS(bytes,ocr,()=>{});
+ const found=r.pageData?.find(x=>x.page===pageNo),text=found?.text||r.pages?.[pageNo-1]||"";
+ if(!text)return toast("このページから文章を抽出できませんでした");
+ p.pageData??=[];const existing=p.pageData.findIndex(x=>x.sourcePage===pageNo&&x.source===file.name);
+ if(existing>=0)p.pageData[existing].text=text;else p.pageData.push({page:pageNo,text,source:file.name,sourcePage:pageNo});
+ p.text=p.pageData.map(x=>`【${x.source||file.name} / ${x.sourcePage||x.page}ページ】\n${x.text}`).join("\n\n");p.pages=p.pageData.length;save();
+ toast(`ページ${pageNo}を抽出しました`);
+}
+async function extractSelectedOriginalPages(pdfIndex,sourceIndex,ocr){
+ const checks=[...document.querySelectorAll("#pdfOriginalPages .originalPageCheck:checked")];
+ if(!checks.length)return toast("抽出するページを選択してください");
+ const p=current().pdfs[pdfIndex],id=p?.originalIds?.[sourceIndex],file=await getPDFOriginal(id);if(!file)return;
+ const bytes=new Uint8Array(await file.arrayBuffer()),r=await extractPDFWithPDFJS(bytes,ocr,()=>{});
+ const nums=new Set(checks.map(x=>Number(x.closest(".originalPage").dataset.page)));
+ const selected=(r.pageData||[]).filter(x=>nums.has(x.page));
+ p.pageData??=[];
+ for(const x of selected){const j=p.pageData.findIndex(y=>(y.sourcePage||y.page)===x.page&&y.source===file.name);if(j>=0)p.pageData[j].text=x.text;else p.pageData.push({page:x.page,text:x.text,source:file.name,sourcePage:x.page})}
+ p.text=p.pageData.map(x=>`【${x.source||file.name} / ${x.sourcePage||x.page}ページ】\n${x.text}`).join("\n\n");p.pages=p.pageData.length;save();
+ toast(`${selected.length}ページを抽出しました`);
+ previewPDF(pdfIndex);
+}
+function showPDFViewer(url,name){/* v11: replaced by in-tool page viewer */ }
 function closePDFViewer(){const m=document.getElementById("pdfViewerModal");if(!m)return;const u=m.dataset.url;m.remove();if(u)URL.revokeObjectURL(u)}
 
 function current(){return store.scenarios.find(s=>s.id===store.currentId)||store.scenarios[0]}
@@ -431,7 +489,7 @@ function pdf(c){
  </div>
  <div class="list">${s.pdfs.map((p,i)=>`<div class="item pdfItem">
   <div class="row between"><div><span class="title">▣ ${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div>
-   <div class="row"><button class="btn" onclick="previewPDF(${i})">抽出テキスト</button>${p.originalIds?.length?`<button class="btn ghost" onclick="openOriginalPDF(${i},0)">原本を見る</button>`:`<label class="btn ghost fileBtn">原本を登録<input type="file" accept="application/pdf" onchange="attachOriginalPDF(${i},this.files[0])"></label>`}<button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
+   <div class="row"><button class="btn" onclick="previewPDF(${i})">抽出テキスト</button>${p.originalIds?.length?`<button class="btn ghost" onclick="openOriginalPDF(${i},0)">原本を全ページ表示</button>`:`<label class="btn ghost fileBtn">原本を登録<input type="file" accept="application/pdf" onchange="attachOriginalPDF(${i},this.files[0])"></label>`}<button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
   </div>
  </div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
  document.getElementById("pdfFile").onchange=readPDFs;
@@ -454,7 +512,7 @@ function attachOriginalPDF(index,file){if(!file)return;const p=current().pdfs[in
 function previewPDF(i){
  const p=current().pdfs[i],pages=getPDFPages(p);
  const c=document.getElementById("content");
- c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を見る':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
+ c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を全ページ表示':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
  <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'kp')">選択範囲→KP</button></div></div>
  <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
 }
@@ -528,7 +586,19 @@ async function extractPDFWithPDFJS(bytes,doOCR,progress){
    progress((n-1)/pdf.numPages,`PDFを解析中… ${n}/${pdf.numPages}ページ`);
    const page=await pdf.getPage(n);
    const tc=await page.getTextContent();
-   const text=tc.items.map(x=>x.str).join(" ").replace(/[ \t]+\n/g,"\n").trim();
+   const vp0=page.getViewport({scale:1});
+   const items=tc.items.map(x=>({str:String(x.str||""),x:Number(x.transform?.[4]||0),y:Number(x.transform?.[5]||0),w:Number(x.width||0)})).filter(x=>x.str.trim());
+   const h=vp0.height;
+   const pageNoRe=/^(?:p(?:age)?[.\\s]*|[Pp]\\.\\s*)?\\d+(?:\\s*[\\/／]\\s*\\d+)?$/;
+   const kept=items.filter(x=>!(pageNoRe.test(x.str.trim()) && (x.y<h*0.12 || x.y>h*0.88)));
+   const rows=[];
+   for(const it of kept){
+    let row=rows.find(r=>Math.abs(r.y-it.y)<3);
+    if(!row){row={y:it.y,items:[]};rows.push(row)}
+    row.items.push(it);
+   }
+   rows.sort((a,b)=>b.y-a.y);
+   const text=rows.map(r=>r.items.sort((a,b)=>a.x-b.x).map(x=>x.str).join(" ").replace(/\\s+/g," ").trim()).filter(Boolean).join("\n").trim();
    let combined=text;
    let ocr="";
    if(doOCR){
