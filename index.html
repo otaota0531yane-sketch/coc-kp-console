@@ -149,6 +149,9 @@ input,select,textarea{max-width:100%}
 @media(min-width:1024px){
  .sidebar{width:238px}
 }
+
+.pdfViewerModal{position:fixed;inset:0;z-index:200;background:rgba(2,8,15,.94);display:flex;flex-direction:column;padding:10px}.pdfViewerHead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 4px;color:#fff}.pdfViewerFrame{flex:1;width:100%;border:1px solid var(--line);border-radius:10px;background:#fff}.paragraphList{display:grid;gap:10px}.paragraphCard{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(8,22,36,.6)}.paragraphHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;color:var(--muted);font-size:12px}.pdfParagraphText{width:100%;min-height:90px;resize:vertical;line-height:1.65;background:#0b1827;border:1px solid var(--line);border-radius:8px;color:#e9eef7;padding:10px}.fileBtn{display:inline-flex;align-items:center;cursor:pointer}.fileBtn input{display:none}
+@media(max-width:599px){.renameTopBtn{grid-column:1/-1}.pdfViewerHead{align-items:flex-start}.pdfViewerHead .row{flex-wrap:nowrap}.paragraphCard .row{gap:5px}.paragraphCard .btn{font-size:12px;padding:7px 8px}}
 </style>
 </head>
 <body>
@@ -161,7 +164,7 @@ input,select,textarea{max-width:100%}
 <section class="main">
   <div class="topbar">
     <select id="scenarioSelect" class="scenarioSelect" onchange="switchScenario(this.value)"></select>
-    <button class="btn ok" onclick="saveCurrentScenario()">✓ 保存</button>
+    <button class="btn ghost renameTopBtn" onclick="renameScenario()">✎ 名前変更</button><button class="btn ok" onclick="saveCurrentScenario()">✓ 保存</button>
     <button class="btn ghost" onclick="downloadCurrentScenario()">⇩ ファイル保存</button>
     <button class="btn danger" onclick="deleteScenario()">削除</button>
     <button class="btn" onclick="newScenario()">＋ 新しいシナリオ</button>
@@ -187,6 +190,24 @@ function load(){
  const s=blankScenario("新しいシナリオ");return {scenarios:[s],currentId:s.id}
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(store))}
+const PDF_DB="coc_kp_pdf_originals";
+function openPDFDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(PDF_DB,1);r.onupgradeneeded=()=>r.result.createObjectStore("files");r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function putPDFOriginal(id,file){try{const db=await openPDFDB();await new Promise((res,rej)=>{const tx=db.transaction("files","readwrite");tx.objectStore("files").put(file,id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}catch(e){console.warn("PDF原本の保存に失敗",e)}}
+async function getPDFOriginal(id){if(!id)return null;try{const db=await openPDFDB();const v=await new Promise((res,rej)=>{const tx=db.transaction("files","readonly");const r=tx.objectStore("files").get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)});db.close();return v}catch(e){return null}}
+async function deletePDFOriginal(id){if(!id)return;try{const db=await openPDFDB();await new Promise((res,rej)=>{const tx=db.transaction("files","readwrite");tx.objectStore("files").delete(id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error)});db.close()}catch(e){}}
+async function openOriginalPDF(pdfIndex,sourceIndex=0){
+ const p=current().pdfs[pdfIndex];const id=p?.originalIds?.[sourceIndex];const file=await getPDFOriginal(id);
+ if(!file){toast("このPDFの原本はこの端末に保存されていません。登録し直すと表示できます。");return}
+ const url=URL.createObjectURL(file);showPDFViewer(url,file.name||p.name);setTimeout(()=>{},1000);
+}
+function showPDFViewer(url,name){
+ let old=document.getElementById("pdfViewerModal");if(old)old.remove();
+ const m=document.createElement("div");m.id="pdfViewerModal";m.className="pdfViewerModal";
+ m.innerHTML=`<div class="pdfViewerHead"><b>${esc(name)}</b><div class="row"><a class="btn ghost" href="${url}" target="_blank" rel="noopener">別画面で開く</a><button class="btn" onclick="closePDFViewer()">閉じる</button></div></div><iframe class="pdfViewerFrame" src="${url}" title="PDFプレビュー"></iframe>`;
+ m.dataset.url=url;document.body.appendChild(m);
+}
+function closePDFViewer(){const m=document.getElementById("pdfViewerModal");if(!m)return;const u=m.dataset.url;m.remove();if(u)URL.revokeObjectURL(u)}
+
 function current(){return store.scenarios.find(s=>s.id===store.currentId)||store.scenarios[0]}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function init(){
@@ -215,7 +236,7 @@ function repairCurrentData(){
  s.session.currentScene=Number.isInteger(s.session.currentScene)?s.session.currentScene:0;s.session.checks??={};
  for(const x of s.scenes){x.title??="無題";x.body??="";x.info??="";x.kp??="";x.tags??=[];x.checks??={body:false,info:false,judge:false,next:false}}
 }function switchScenario(id){if(store.scenarios.some(s=>s.id===id)){store.currentId=id;save();render()}}
-function newScenario(){const n=prompt("シナリオ名","新しいシナリオ");if(!n?.trim())return;const s=blankScenario(n.trim());store.store.scenarios.push(s);store.currentId=s.id;save();drawScenario();show("home")}
+function newScenario(){const n=prompt("シナリオ名","新しいシナリオ");if(!n?.trim())return;const s=blankScenario(n.trim());store.scenarios.push(s);store.currentId=s.id;save();drawScenario();show("home")}
 function saveCurrentScenario(){
  save();
  drawScenario();
@@ -410,7 +431,7 @@ function pdf(c){
  </div>
  <div class="list">${s.pdfs.map((p,i)=>`<div class="item pdfItem">
   <div class="row between"><div><span class="title">▣ ${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div>
-   <div class="row"><button class="btn" onclick="previewPDF(${i})">プレビュー</button><button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
+   <div class="row"><button class="btn" onclick="previewPDF(${i})">抽出テキスト</button>${p.originalIds?.length?`<button class="btn ghost" onclick="openOriginalPDF(${i},0)">原本を見る</button>`:`<label class="btn ghost fileBtn">原本を登録<input type="file" accept="application/pdf" onchange="attachOriginalPDF(${i},this.files[0])"></label>`}<button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
   </div>
  </div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
  document.getElementById("pdfFile").onchange=readPDFs;
@@ -422,19 +443,22 @@ function getPDFPages(p){
  return chunks.map((x,i)=>{const m=x.match(/^【(\d+)ページ】\n?([\s\S]*)$/);return {page:m?Number(m[1]):i+1,text:m?m[2]:x}});
 }
 
+function splitParagraphs(text){
+ const raw=String(text||"").replace(/\r/g,"").split(/\n\s*\n+/).map(x=>x.trim()).filter(Boolean);
+ if(raw.length)return raw;
+ return String(text||"").split(/\n+/).map(x=>x.trim()).filter(Boolean);
+}
+function copyParagraph(i,n){const p=current().pdfs[i],pages=getPDFPages(p),paras=splitParagraphs(pages[n]?.text||"");if(paras.length&&paras[n]!==undefined)copyText(paras[n])}
+function copyPDFPageParagraph(pdfIndex,pageIndex,paraIndex){const p=current().pdfs[pdfIndex],pages=getPDFPages(p),t=splitParagraphs(pages[pageIndex]?.text||"")[paraIndex]||"";if(t)copyText(t)}
+function attachOriginalPDF(index,file){if(!file)return;const p=current().pdfs[index];const id=(crypto.randomUUID?.()||String(Date.now()+Math.random()));p.originalIds=[id];p.sources=[file.name];putPDFOriginal(id,file).then(()=>{save();render();toast("PDF原本を登録しました")})}
 function previewPDF(i){
  const p=current().pdfs[i],pages=getPDFPages(p);
  const c=document.getElementById("content");
- c.innerHTML=`<div class="card">
-  <div class="row between"><div><div class="eyebrow">PDF PREVIEW</div><h2>${esc(p.name)}</h2><p class="muted small">ページごとに必要な部分を選択して取り込めます。iPhone/iPadでは文章を長押しして範囲選択できます。</p></div><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div>
-  <div class="previewActions"><span class="muted small">選択範囲：</span><button class="btn" onclick="appendSelectedPDF(${i},'body')">本文へ追加</button><button class="btn" onclick="appendSelectedPDF(${i},'info')">公開情報へ追加</button><button class="btn" onclick="appendSelectedPDF(${i},'kp')">KP情報へ追加</button><button class="btn ghost" onclick="copySelectedPDF()">選択範囲をコピー</button></div>
- </div>
- <div class="pdfPages">${pages.map((x,n)=>`<div class="pdfPage">
-  <div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,"0")}</span><span class="muted small">このページだけ取り込む</span></div>
-  <textarea id="pdfPreview_${i}_${n}" class="pdfPreviewText" readonly>${esc(x.text)}</textarea>
-  <div class="row"><button class="btn ghost" onclick="appendWholePDFPage(${i},${n},'body')">このページ→本文</button><button class="btn ghost" onclick="appendWholePDFPage(${i},${n},'info')">このページ→公開</button><button class="btn ghost" onclick="appendWholePDFPage(${i},${n},'kp')">このページ→KP</button></div>
- </div>`).join("")}</div>`;
+ c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を見る':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
+ <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'kp')">選択範囲→KP</button></div></div>
+ <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
 }
+function appendTextToScene(pdfIndex,pageIndex,paraIndex,field){const p=current().pdfs[pdfIndex],pages=getPDFPages(p),t=splitParagraphs(pages[pageIndex]?.text||"")[paraIndex]||"";if(!t)return;const s=current(),label={body:'本文',info:'公開情報',kp:'KP情報'}[field],i=prompt(`どのシーンの${label}へ追加しますか？\n番号を入力（1〜${s.scenes.length}）`,String(s.scenes.length||1)),n=Number(i)-1;if(!Number.isInteger(n)||n<0||n>=s.scenes.length)return;s.scenes[n][field]=(s.scenes[n][field]?s.scenes[n][field]+'\n\n':'')+t;save();toast(`シーン${n+1}の${label}へ追加しました`)}
 
 function selectedPDFText(){
  const el=document.activeElement;
@@ -469,15 +493,16 @@ async function loadPDFjs(){
 
 async function readPDFs(e){
  const files=Array.from(e.target.files||[]);if(!files.length)return;
- const st=document.getElementById("pdfStatus"),pr=document.getElementById("prog"),ocrOn=document.getElementById("pdfOcr")?.checked!==false;
- pr.hidden=false;pr.value=0;
+ const st=document.getElementById("pdfStatus"),pr=document.getElementById("prog"),ocrOn=document.getElementById("pdfOcr")?.checked!==false;pr.hidden=false;pr.value=0;
  try{
-  const all=[];
+  const all=[],originalIds=[],sources=[];
   for(let fi=0;fi<files.length;fi++){
-   const result=await extractPDFWithPDFJS(new Uint8Array(await files[fi].arrayBuffer()),ocrOn,(a,msg)=>{pr.value=(fi+a)/files.length;st.textContent=`${fi+1}/${files.length}：${msg}`});
-   result.pages.forEach((text,pi)=>all.push({page:all.length+1,text,source:files[fi].name,sourcePage:pi+1}));
+   const file=files[fi],id=(crypto.randomUUID?.()||String(Date.now()+Math.random()));
+   const result=await extractPDFWithPDFJS(new Uint8Array(await file.arrayBuffer()),ocrOn,(a,msg)=>{pr.value=(fi+a)/files.length;st.textContent=`${fi+1}/${files.length}：${msg}`});
+   await putPDFOriginal(id,file);originalIds.push(id);sources.push(file.name);
+   result.pages.forEach((text,pi)=>all.push({page:all.length+1,text,source:file.name,sourcePage:pi+1}));
   }
-  current().pdfs.push({name:files.length===1?files[0].name:`${files[0].name} ほか${files.length-1}冊`,pages:all.length,text:all.map(x=>`【${x.source} / ${x.sourcePage}ページ】\n${x.text}`).join("\n\n"),pageData:all,sources:files.map(f=>f.name)});
+  current().pdfs.push({id:crypto.randomUUID?.()||String(Date.now()),name:files.length===1?files[0].name:`${files[0].name} ほか${files.length-1}冊`,pages:all.length,text:all.map(x=>`【${x.source} / ${x.sourcePage}ページ】\n${x.text}`).join("\n\n"),pageData:all,sources,originalIds});
   save();st.textContent=`${files.length}冊を1つの資料として登録しました（${all.length}ページ）`;render();
  }catch(err){console.error(err);st.textContent="PDFを読み込めませんでした。"}
 }
@@ -532,7 +557,7 @@ async function extractPDFWithPDFJS(bytes,doOCR,progress){
  return {pages,pageData};
 }
 function pdfToScenes(i){const p=current().pdfs[i],blocks=p.text.split(/\n{2,}(?=【\d+ページ】)/).filter(Boolean);blocks.forEach((b,n)=>{const m=b.match(/^【(\d+)ページ】\n?([\s\S]*)$/);current().scenes.push({title:`PDF ${m?m[1]:n+1}ページ`,body:m?m[2]:b,info:"",kp:""})});save();show("scenes")}
-function delPDF(i){if(confirm("このPDF情報を削除しますか？")){current().pdfs.splice(i,1);save();render()}}
+async function delPDF(i){const p=current().pdfs[i];if(!p)return;if(confirm("このPDF情報を削除しますか？")){for(const id of (p.originalIds||[]))await deletePDFOriginal(id);current().pdfs.splice(i,1);save();render()}}
 function backup(c){
  const s=current();
  c.innerHTML=`<div class="card"><div class="eyebrow">BACKUP</div><h2>シナリオの保存・復元</h2><p class="muted">現在のシナリオだけをファイルとして保存できます。別端末へ移すときや、作業前のバックアップに使えます。</p>
