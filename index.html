@@ -23,6 +23,10 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}
 @media(max-width:820px){.sceneCard .row.between{align-items:flex-start;gap:8px}.sceneCard .row.between>.row{flex-wrap:wrap;justify-content:flex-end}.previewActions{position:sticky;top:0;z-index:5;background:#0b1622;padding:10px 0}.pdfPreviewText{min-height:420px}}
 
 .navIcon{display:inline-flex;align-items:center;justify-content:center;width:22px;min-width:22px;font-size:17px;line-height:1}
+.hero{padding:22px}.hero h1{margin:4px 0 6px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:18px}.stat{padding:12px;border:1px solid var(--line);border-radius:11px;background:#0b1725}.stat span{display:block;color:var(--muted);font-size:11px}.stat b{display:block;font-size:20px;margin-top:4px}.grid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px;margin-top:12px}.fileBtn{display:inline-flex;align-items:center;cursor:pointer}.fileBtn input{display:none}
+.currentScene{border-color:#438fca;box-shadow:0 0 0 1px #438fca33}.nowCard{border-color:#2f6590}.progressLine{height:7px;background:#0a1522;border-radius:99px;overflow:hidden;margin:14px 0 6px}.progressLine span{display:block;height:100%;background:#4aa3ff;border-radius:99px}.sessionGrid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px}.sessionMain{grid-row:span 2}.sessionText{font-size:16px;line-height:1.9}.kpPanel{border-color:#6c3040;background:#171118}.sessionChecks{margin-top:14px}.check{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#0b1827;color:#c5d2e0}.check input{width:auto}.searchSnippet{color:#aab9ca;font-size:13px;line-height:1.5;margin-top:8px;max-width:850px}.searchCount{color:var(--muted);font-size:12px;margin-bottom:8px}
+@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.grid,.sessionGrid{grid-template-columns:1fr}.sessionMain{grid-row:auto}.sessionText{font-size:15px}}
+
 .navText{display:inline}
 
 .sidebottom{margin-top:auto;display:grid;gap:7px}.sidebottom button{background:#0f1b2d;border:1px solid var(--line);color:#b9c7d8;border-radius:10px;padding:9px}
@@ -67,13 +71,16 @@ a.link{color:#7fc5ff}.footer-note{font-size:11px;color:#71859c;margin-top:18px}
 <script>
 const KEY="kp_console_v6";
 const NAV=[
- ["home","⌂","ホーム"],["scenes","▤","シナリオ"],["kp","✦","KP情報"],["ho","◇","HO・秘匿"],
- ["pc","♙","PC・キャラクター"],["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],
- ["prep","✓","準備"]
+ ["home","⌂","ホーム"],["session","▶","今ここ"],["search","⌕","検索"],["scenes","▤","シナリオ"],
+ ["kp","✦","KP情報"],["ho","◇","HO・秘匿"],["pc","♙","PC・キャラクター"],
+ ["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],["prep","✓","準備"]
 ];
 let store=load();
 let tab="home";
-function blankScenario(name="新しいシナリオ"){return {id:(crypto.randomUUID?.()||String(Date.now()+Math.random())),name,scenes:[],kpInfo:"",hos:[],pcs:[],actors:{npc:[],enemy:[]},pdfs:[],prep:{}}}
+function blankScenario(name="新しいシナリオ"){
+ return {id:(crypto.randomUUID?.()||String(Date.now()+Math.random())),name,scenes:[],kpInfo:"",hos:[],pcs:[],
+ actors:{npc:[],enemy:[]},pdfs:[],prep:{},bookmarks:[],session:{currentScene:0,checks:{}}}
+}
 function load(){
  try{let x=JSON.parse(localStorage.getItem(KEY)||"null");if(x?.scenarios?.length)return x}catch(e){}
  const s=blankScenario("新しいシナリオ");return {scenarios:[s],currentId:s.id}
@@ -97,14 +104,12 @@ function drawScenario(){document.getElementById("scenarioSelect").innerHTML=stor
 function show(t){tab=t;drawNav();render()}
 function repairCurrentData(){
  const s=current();
- s.actors??={};s.actors.npc??=[];s.actors.enemy??=[];
- for(const type of ["npc","enemy"]) for(const a of s.actors[type]){
-  a.name??=type==="npc"?"NPC":"敵";a.hp??="";a.mp??="";a.dex??="";a.params??="";a.skills??="";a.commands??="";a.setting??="";a.memo??="";
- }
- s.pcs??=[];s.hos??=[];s.scenes??=[];s.pdfs??=[];s.kpInfo??="";
- save();drawScenario();
-}
-function switchScenario(id){if(store.scenarios.some(s=>s.id===id)){store.currentId=id;save();render()}}
+ s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};
+ s.actors.npc??=[];s.actors.enemy??=[];s.pdfs??=[];s.prep??={};s.kpInfo??="";
+ s.bookmarks??=[];s.session??={currentScene:0,checks:{}};
+ s.session.currentScene=Number.isInteger(s.session.currentScene)?s.session.currentScene:0;s.session.checks??={};
+ for(const x of s.scenes){x.title??="無題";x.body??="";x.info??="";x.kp??="";x.tags??=[];x.checks??={body:false,info:false,judge:false,next:false}}
+}function switchScenario(id){if(store.scenarios.some(s=>s.id===id)){store.currentId=id;save();render()}}
 function newScenario(){const n=prompt("シナリオ名","新しいシナリオ");if(!n?.trim())return;const s=blankScenario(n.trim());store.scenarios.push(s);store.currentId=s.id;save();drawScenario();show("home")}
 function saveCurrentScenario(){
  save();
@@ -123,65 +128,61 @@ function downloadCurrentScenario(){
 function renameScenario(){const s=current(),n=prompt("シナリオ名",s.name);if(n?.trim()){s.name=n.trim();save();drawScenario();render()}}
 function deleteScenario(){if(store.scenarios.length===1)return alert("最後のシナリオは削除できません。");const s=current();if(!confirm(`「${s.name}」を削除しますか？`))return;store.scenarios=store.scenarios.filter(x=>x.id!==s.id);store.currentId=store.scenarios[0].id;save();drawScenario();show("home")}
 function render(){
+ repairCurrentData();drawScenario();
  const c=document.getElementById("content");
- const fn={home:home,scenes:scenes,kp:kp,ho:ho,pc:pc,npc:actor,enemy:actor,pdf:pdf,prep:prep,backup:backup}[tab];
- if(!fn){tab="home";drawNav();return render()}
- try{
-   if(tab==="npc"||tab==="enemy") fn(c,tab);
-   else fn(c);
- }catch(err){
-   console.error(err);
-   c.innerHTML=`<div class="card"><h2>表示できませんでした</h2><p class="muted">このタブのデータに古い形式の項目がある可能性があります。ページを再読み込みして、もう一度開いてください。</p><button class="btn" onclick="repairCurrentData();render()">データを整える</button></div>`;
- }
+ ({home,session,search,scenes,kp,ho,pc,npc:(x)=>actor(x,"npc"),enemy:(x)=>actor(x,"enemy"),pdf,prep}[tab]||home)(c);
 }
 function home(c){
- const s=current();c.innerHTML=`<div class="card hero"><div class="eyebrow">CURRENT SCENARIO</div><div class="row between"><div><h1>${esc(s.name)}</h1><p class="muted">長編シナリオを、読む・整理する・使うをひとつの画面で。</p></div><button class="btn ghost" onclick="renameScenario()">✎ 名前変更</button></div>
- <div class="stats"><div class="stat"><span>シーン</span><b>${s.scenes.length}</b></div><div class="stat"><span>KP情報</span><b>${s.kpInfo?1:0}</b></div><div class="stat"><span>キャラクター</span><b>${s.pcs.length}</b></div><div class="stat"><span>PDF</span><b>${s.pdfs.length}</b></div></div></div>
- <div class="grid"><div class="card"><h3>▤ シナリオ</h3><p class="muted small">本文・描写・公開情報・KP情報をシーン単位で整理。</p><button class="btn" onclick="show('scenes')">シーンを見る</button></div>
- <div class="card"><h3>✦ KP情報</h3><p class="muted small">回すときに必要な重要情報を独立して確認。</p><button class="btn" onclick="show('kp')">KP情報を見る</button></div>
- <div class="card"><h3>♙ キャラクター</h3><p class="muted small">URLを登録してすぐ開けるようにします。</p><button class="btn" onclick="show('pc')">キャラシを見る</button></div>
- <div class="card"><h3>▣ PDF</h3><p class="muted small">本文・画像内の文字・枠内の文字を読み取り、シーンへ整理。</p><button class="btn" onclick="show('pdf')">PDFを読み込む</button></div></div>
- <div class="card"><h3>運用の流れ</h3><div class="row"><span class="badge">01 シナリオ</span> → <span class="badge">02 PDF</span> → <span class="badge">03 整理</span> → <span class="badge">04 KP情報</span> → <span class="badge">05 ココフォリア用にコピー</span></div></div>
- <p class="footer-note">シナリオデータはこの端末のブラウザ内に保存されます。本文を外部サービスへ送信する機能はありません。</p>`
+ const s=current(),total=s.scenes.length,cur=Math.min(Math.max(s.session.currentScene||0,0),Math.max(total-1,0));
+ const x=s.scenes[cur],done=x?Object.values(x.checks||{}).filter(Boolean).length:0;
+ c.innerHTML=`<div class="hero card"><div class="eyebrow">KP DASHBOARD</div><h1>${esc(s.name)}</h1>
+ <p class="muted">シナリオの準備から本番中の進行まで、ここをKP用の司令塔として使えます。</p>
+ <div class="stats"><div class="stat"><span>シーン</span><b>${total}</b></div><div class="stat"><span>PDF資料</span><b>${s.pdfs.length}</b></div><div class="stat"><span>PC</span><b>${s.pcs.length}</b></div><div class="stat"><span>NPC / 敵</span><b>${s.actors.npc.length} / ${s.actors.enemy.length}</b></div></div></div>
+ <div class="grid"><div class="card"><div class="row between"><div><div class="eyebrow">CURRENT</div><h2>${x?esc(x.title):"シーン未登録"}</h2><p class="muted small">${x?`シーン ${cur+1} / ${total}`:"まずシーンを作成してください。"}</p></div><button class="btn" onclick="show('session')">今ここを開く</button></div>
+ ${x?`<div class="progressLine"><span style="width:${done*25}%"></span></div><div class="small muted">進行チェック ${done}/4</div>`:""}</div>
+ <div class="card"><div class="eyebrow">QUICK SEARCH</div><h2>必要な情報を探す</h2><div class="row"><input id="homeSearch" placeholder="NPC名、技能、SAN、キーワード…" onkeydown="if(event.key==='Enter')runSearch(this.value)"><button class="btn" onclick="runSearch(document.getElementById('homeSearch').value)">検索</button></div></div></div>
+ <div class="card"><div class="eyebrow">QUICK ACTION</div><div class="row"><button class="btn" onclick="addScene()">＋ シーン</button><button class="btn" onclick="show('pdf')">▣ PDFを整理</button><button class="btn" onclick="show('npc')">♧ NPC</button><button class="btn" onclick="show('enemy')">⚔ 敵</button><button class="btn ghost" onclick="show('prep')">✓ 準備チェック</button><button class="btn ghost" onclick="backup(document.getElementById('content'))">⇩ 保存・復元</button></div></div>`;
+}function setCurrentScene(i){const s=current();if(!s.scenes.length)return;s.session.currentScene=Math.max(0,Math.min(i,s.scenes.length-1));save();show("session")}
+function toggleSceneCheck(i,k,v){current().scenes[i].checks[k]=v;save()}
+function session(c){
+ const s=current(),total=s.scenes.length;
+ if(!total){c.innerHTML='<div class="empty">シーンがまだありません。<br><button class="btn" onclick="addScene()">＋ シーンを作る</button></div>';return}
+ const i=Math.max(0,Math.min(s.session.currentScene||0,total-1)),x=s.scenes[i],checks=x.checks||{};
+ c.innerHTML=`<div class="card nowCard"><div class="row between"><div><div class="eyebrow">NOW PLAYING</div><h1>${esc(x.title)}</h1><div class="muted small">SCENE ${i+1} / ${total}</div></div><div class="row"><button class="btn ghost" onclick="setCurrentScene(${i-1})" ${i===0?"disabled":""}>← 前</button><button class="btn" onclick="setCurrentScene(${i+1})" ${i===total-1?"disabled":""}>次 →</button></div></div>
+ <div class="row sessionChecks">${[["body","描写済み"],["info","情報提示済み"],["judge","判定済み"],["next","次への条件確認"]].map(([k,l])=>`<label class="check"><input type="checkbox" ${checks[k]?"checked":""} onchange="toggleSceneCheck(${i},'${k}',this.checked)"><span>${l}</span></label>`).join("")}</div></div>
+ <div class="sessionGrid"><div class="card sessionMain"><div class="row between"><h2>本文</h2><button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">コピー</button></div><div class="sessionText">${nl2br(x.body)}</div></div>
+ <div class="card"><div class="row between"><h2>公開情報</h2><button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">コピー</button></div><div class="sessionText">${nl2br(x.info)||'<span class="muted">なし</span>'}</div></div>
+ <div class="card kpPanel"><div class="row between"><h2>KP情報</h2><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">コピー</button></div><div class="sessionText">${nl2br(x.kp)||'<span class="muted">なし</span>'}</div></div></div>`;
+}
+function nl2br(v){return esc(v||"").replace(/\n/g,"<br>")}
+function runSearch(q){show("search");setTimeout(()=>{const el=document.getElementById("searchInput");if(el){el.value=q||"";renderSearchResults(q||"")}},30)}
+function search(c){c.innerHTML=`<div class="card"><div class="eyebrow">SEARCH</div><h2>シナリオ内検索</h2><div class="row"><input id="searchInput" placeholder="NPC名、技能、SAN、キーワード…" oninput="renderSearchResults(this.value)" autofocus><button class="btn ghost" onclick="this.closest('.card').querySelector('input').value='';renderSearchResults('')">クリア</button></div><p class="muted small">シーン、KP情報、HO、PC、NPC、敵、PDFを横断検索します。</p></div><div id="searchResults"></div>`;renderSearchResults("")}
+function renderSearchResults(q){
+ const box=document.getElementById("searchResults");if(!box)return;q=String(q||"").trim().toLowerCase();if(!q){box.innerHTML='<div class="empty">キーワードを入力してください。</div>';return}
+ const s=current(),r=[],hit=(title,label,text,action)=>{if(String(text||"").toLowerCase().includes(q))r.push({title,label,text,action})};
+ s.scenes.forEach((x,i)=>{hit(`シーン${i+1}：${x.title}`,"本文",x.body,`openScene(${i})`);hit(`シーン${i+1}：${x.title}`,"公開",x.info,`openScene(${i})`);hit(`シーン${i+1}：${x.title}`,"KP",x.kp,`openScene(${i})`)});
+ s.hos.forEach(x=>hit(x.name,"HO・秘匿",`${x.secret||""}\n${x.memo||""}`,"show('ho')"));
+ s.pcs.forEach(x=>hit(x.name,"PC",`${x.memo||""}\n${x.url||""}`,"show('pc')"));
+ ["npc","enemy"].forEach(t=>s.actors[t].forEach(x=>hit(x.name,t==="npc"?"NPC":"敵",`${x.memo||""}\n${x.skills||""}\n${JSON.stringify(x.stats||{})}`,`actor('${t}')`)));
+ s.pdfs.forEach((p,i)=>hit(p.name,"PDF",p.text,`previewPDF(${i})`));
+ box.innerHTML=r.length?`<div class="searchCount">${r.length}件</div><div class="list">${r.map(x=>`<div class="item"><div class="row between"><div><span class="badge">${esc(x.label)}</span> <b>${esc(x.title)}</b><div class="searchSnippet">${esc(String(x.text||"").replace(/\s+/g," ").slice(0,280))}</div></div><button class="btn ghost" onclick="${x.action}">開く</button></div></div>`).join("")}</div>`:'<div class="empty">見つかりませんでした。</div>';
 }
 function scenes(c){
  const s=current();
- c.innerHTML=`<div class="card">
-  <div class="row between"><div><div class="eyebrow">SCENES</div><h2>シーン</h2><p class="muted small">本文・公開情報・KP情報を分けて管理。長文でも一覧から内容を確認できます。</p></div><button class="btn" onclick="addScene()">＋ 新しいシーン</button></div>
- </div>
- <div class="sceneList">${s.scenes.map((x,i)=>`<div class="sceneCard">
-  <div class="row between"><div class="row"><span class="sceneNo">${String(i+1).padStart(2,"0")}</span><div><h3>${esc(x.title)}</h3><div class="meta">${x.body?`本文 ${x.body.length.toLocaleString()}字`:"本文なし"}　${x.info?`公開情報あり`:""}　${x.kp?`KP情報あり`:""}</div></div></div>
-  <div class="row"><button class="btn ghost" onclick="openScene(${i})">開く</button><button class="btn danger" onclick="delScene(${i})">削除</button></div></div>
-  <div class="scenePreview">
-   ${x.body?`<div><span class="sceneTag bodyTag">本文</span><span>${esc(x.body.slice(0,180))}${x.body.length>180?"…":""}</span></div>`:""}
-   ${x.info?`<div><span class="sceneTag infoTag">公開</span><span>${esc(x.info.slice(0,120))}${x.info.length>120?"…":""}</span></div>`:""}
-   ${x.kp?`<div><span class="sceneTag kpTag">KP</span><span>${esc(x.kp.slice(0,120))}${x.kp.length>120?"…":""}</span></div>`:""}
-  </div>
- </div>`).join("")||`<div class="empty">シーンがまだありません。</div>`}</div>`
-}
-function addScene(){current().scenes.push({title:"新しいシーン",body:"",info:"",kp:""});save();show("scenes");}
-function delScene(i){if(confirm("このシーンを削除しますか？")){current().scenes.splice(i,1);save();render()}}
+ c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENES</div><h2>シーン</h2><p class="muted small">本文・公開情報・KP情報を分け、進行状況も確認できます。</p></div><button class="btn" onclick="addScene()">＋ 新しいシーン</button></div></div>
+ <div class="sceneList">${s.scenes.map((x,i)=>{const checks=Object.values(x.checks||{}).filter(Boolean).length;return `<div class="sceneCard ${i===s.session.currentScene?'currentScene':''}">
+ <div class="row between"><div class="row"><span class="sceneNo">${String(i+1).padStart(2,"0")}</span><div><h3>${esc(x.title)}</h3><div class="meta">進行 ${checks}/4　${x.body?`本文 ${x.body.length.toLocaleString()}字`:"本文なし"}　${x.info?"公開情報 ":""}${x.kp?"KP情報":""}</div></div></div>
+ <div class="row"><button class="btn ghost" onclick="setCurrentScene(${i})">▶ 今ここ</button><button class="btn" onclick="openScene(${i})">開く</button><button class="btn danger" onclick="delScene(${i})">削除</button></div></div>
+ <div class="scenePreview">${x.body?`<div><span class="sceneTag bodyTag">本文</span><span>${esc(x.body.slice(0,180))}${x.body.length>180?"…":""}</span></div>`:""}${x.info?`<div><span class="sceneTag infoTag">公開</span><span>${esc(x.info.slice(0,120))}${x.info.length>120?"…":""}</span></div>`:""}${x.kp?`<div><span class="sceneTag kpTag">KP</span><span>${esc(x.kp.slice(0,120))}${x.kp.length>120?"…":""}</span></div>`:""}</div></div>`}).join("")||`<div class="empty">シーンがまだありません。</div>`}</div>`;
+}function addScene(){const s=current();s.scenes.push({title:`シーン ${s.scenes.length+1}`,body:"",info:"",kp:"",tags:[],checks:{body:false,info:false,judge:false,next:false}});save();show("scenes");}
 function openScene(i){
  const x=current().scenes[i];
- document.getElementById("content").innerHTML=`<div class="card">
-  <div class="row between"><div><div class="eyebrow">SCENE ${i+1}</div><h2>シーン編集</h2></div><button class="btn ghost" onclick="show('scenes')">← 一覧</button></div>
-  <label>タイトル</label><input value="${esc(x.title)}" oninput="current().scenes[${i}].title=this.value;save()">
- </div>
- <div class="sceneEditGrid">
-  <div class="card sceneBody"><div class="row between"><h3>本文・描写</h3><span class="sceneTag bodyTag">本文</span></div>
-   <textarea class="sceneArea" oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea>
-   <button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">本文をコピー</button>
-  </div>
-  <div class="card sceneInfo"><div class="row between"><h3>PLへ公開する情報</h3><span class="sceneTag infoTag">公開</span></div>
-   <textarea class="sceneArea" oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea>
-   <button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">公開情報をコピー</button>
-  </div>
-  <div class="card sceneKP"><div class="row between"><h3>KPだけが見る情報</h3><span class="sceneTag kpTag">KP</span></div>
-   <textarea class="sceneArea" oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea>
-   <button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button>
-  </div>
- </div>
- <div class="card"><div class="row"><button class="btn" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">本文＋公開情報をコピー</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info+'\\n\\n'+current().scenes[${i}].kp)">全部コピー</button></div></div>`
+ document.getElementById("content").innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENE ${i+1}</div><h2>シーン編集</h2></div><div class="row"><button class="btn ghost" onclick="setCurrentScene(${i})">▶ 今ここ</button><button class="btn ghost" onclick="show('scenes')">← 一覧</button></div></div><label>タイトル</label><input value="${esc(x.title)}" oninput="current().scenes[${i}].title=this.value;save()"></div>
+ <div class="sceneEditGrid"><div class="card sceneBody"><div class="row between"><h3>本文・描写</h3><span class="sceneTag bodyTag">本文</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea><button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">本文をコピー</button></div>
+ <div class="card sceneInfo"><div class="row between"><h3>PLへ公開する情報</h3><span class="sceneTag infoTag">公開</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea><button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">公開情報をコピー</button></div>
+ <div class="card sceneKP"><div class="row between"><h3>KPだけが見る情報</h3><span class="sceneTag kpTag">KP</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div>
+ <div class="card"><div class="eyebrow">PROGRESS</div><div class="row sessionChecks">${[["body","描写済み"],["info","情報提示済み"],["judge","判定済み"],["next","次への条件確認"]].map(([k,l])=>`<label class="check"><input type="checkbox" ${x.checks?.[k]?"checked":""} onchange="toggleSceneCheck(${i},'${k}',this.checked)"><span>${l}</span></label>`).join("")}</div></div>
+ <div class="card"><div class="row"><button class="btn" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">本文＋公開情報をコピー</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info+'\\n\\n'+current().scenes[${i}].kp)">全部コピー</button></div></div>`;
 }
 function kp(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">KEEPER NOTES</div><div class="row between"><h2>KP情報</h2><button class="btn" onclick="copyText(current().kpInfo)">KP情報をコピー</button></div>
@@ -272,7 +273,7 @@ function pdf(c){
   <div class="eyebrow">SCENARIO PDF</div><h2>PDF読み込み</h2>
   <p class="muted">PDFを読み込んだあと、プレビューでページごとの文章を確認できます。必要な範囲だけ選択して、本文・公開情報・KP情報へ取り込めます。</p>
   <div class="file">
-   <input id="pdfFile" type="file" accept="application/pdf">
+   <input id="pdfFile" type="file" accept="application/pdf" multiple>
    <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="pdfOcr" type="checkbox" checked style="width:auto"><span>画像・図・スキャン・枠内の文字もOCRする</span></label>
    <p class="small muted">OCRをONにすると、画像化された文字も認識します。長いPDFほど時間がかかります。</p>
    <progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div>
@@ -283,7 +284,7 @@ function pdf(c){
    <div class="row"><button class="btn" onclick="previewPDF(${i})">プレビュー</button><button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
   </div>
  </div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
- document.getElementById("pdfFile").onchange=readPDF;
+ document.getElementById("pdfFile").onchange=readPDFs;
 }
 
 function getPDFPages(p){
@@ -337,27 +338,20 @@ async function loadPDFjs(){
  return mod;
 }
 
-async function readPDF(e){
- const f=e.target.files?.[0];if(!f)return;
+async function readPDFs(e){
+ const files=Array.from(e.target.files||[]);if(!files.length)return;
  const st=document.getElementById("pdfStatus"),pr=document.getElementById("prog"),ocrOn=document.getElementById("pdfOcr")?.checked!==false;
- pr.hidden=false;pr.value=0;st.textContent="PDFを読み込んでいます…";
+ pr.hidden=false;pr.value=0;
  try{
-  const bytes=new Uint8Array(await f.arrayBuffer());
-  const result=await extractPDFWithPDFJS(bytes,ocrOn,(a,msg)=>{pr.value=a;st.textContent=msg});
-  if(!result.pages.length)throw Error("no pages");
-  current().pdfs.push({
-   name:f.name,
-   pages:result.pages.length,
-   text:result.pages.map((x,i)=>`【${i+1}ページ】\n${x}`).join("\n\n"),
-   pageData:result.pageData||[]
-  });
-  save();st.textContent=`読み込み完了：${result.pages.length}ページ / ${result.pages.join("\n").length.toLocaleString()}文字`;render();
- }catch(err){
-  console.error(err);
-  st.textContent="PDFを読み込めませんでした。PDF形式やブラウザの対応状況を確認してください。";
- }
+  const all=[];
+  for(let fi=0;fi<files.length;fi++){
+   const result=await extractPDFWithPDFJS(new Uint8Array(await files[fi].arrayBuffer()),ocrOn,(a,msg)=>{pr.value=(fi+a)/files.length;st.textContent=`${fi+1}/${files.length}：${msg}`});
+   result.pages.forEach((text,pi)=>all.push({page:all.length+1,text,source:files[fi].name,sourcePage:pi+1}));
+  }
+  current().pdfs.push({name:files.length===1?files[0].name:`${files[0].name} ほか${files.length-1}冊`,pages:all.length,text:all.map(x=>`【${x.source} / ${x.sourcePage}ページ】\n${x.text}`).join("\n\n"),pageData:all,sources:files.map(f=>f.name)});
+  save();st.textContent=`${files.length}冊を1つの資料として登録しました（${all.length}ページ）`;render();
+ }catch(err){console.error(err);st.textContent="PDFを読み込めませんでした。"}
 }
-
 async function extractPDFWithPDFJS(bytes,doOCR,progress){
  const pdfjs=await loadPDFjs();
  const pdf=await pdfjs.getDocument({data:bytes}).promise;
@@ -410,6 +404,20 @@ async function extractPDFWithPDFJS(bytes,doOCR,progress){
 }
 function pdfToScenes(i){const p=current().pdfs[i],blocks=p.text.split(/\n{2,}(?=【\d+ページ】)/).filter(Boolean);blocks.forEach((b,n)=>{const m=b.match(/^【(\d+)ページ】\n?([\s\S]*)$/);current().scenes.push({title:`PDF ${m?m[1]:n+1}ページ`,body:m?m[2]:b,info:"",kp:""})});save();show("scenes")}
 function delPDF(i){if(confirm("このPDF情報を削除しますか？")){current().pdfs.splice(i,1);save();render()}}
+function backup(c){
+ const s=current();
+ c.innerHTML=`<div class="card"><div class="eyebrow">BACKUP</div><h2>シナリオの保存・復元</h2><p class="muted">現在のシナリオだけをファイルとして保存できます。別端末へ移すときや、作業前のバックアップに使えます。</p>
+ <div class="row"><button class="btn" onclick="exportScenario()">このシナリオを保存</button><label class="btn ghost fileBtn">復元するファイルを選択<input type="file" accept=".json,application/json" onchange="importScenario(this.files[0])"></label></div></div>
+ <div class="card"><div class="eyebrow">DATA SAFETY</div><p class="small muted">PDF本文やKP情報を含むシナリオデータは、このツールの保存領域に保持されます。バックアップファイルは手元で管理してください。</p></div>`;
+}
+function exportScenario(){
+ const s=current(),blob=new Blob([JSON.stringify(s,null,2)],{type:"application/json"}),a=document.createElement("a");
+ a.href=URL.createObjectURL(blob);a.download=(s.name||"scenario").replace(/[\\\\/:*?"<>|]/g,"_")+".json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importScenario(file){
+ if(!file)return;const r=new FileReader();r.onload=()=>{try{const data=JSON.parse(r.result);data.id=crypto.randomUUID?.()||String(Date.now());repairScenario(data);scenarios.push(data);saveAll();switchScenario(data.id)}catch(e){alert("このファイルは復元できませんでした。")}};r.readAsText(file);
+}
+function repairScenario(s){s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};s.actors.npc??=[];s.actors.enemy??=[];s.pdfs??=[];s.prep??={};s.kpInfo??="";s.bookmarks??=[];s.session??={currentScene:0,checks:{}};s.scenes.forEach(x=>{x.body??="";x.info??="";x.kp??="";x.checks??={body:false,info:false,judge:false,next:false}})}
 function prep(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">PREPARATION</div><h2>ココフォリア用準備</h2><p class="muted small">コピーして、登録したい場所へ貼り付けるだけの準備画面。</p></div>
  <div class="grid"><div class="card"><h3>シーン</h3>${s.scenes.map((x,i)=>`<div class="row between"><span>${esc(x.title)}</span><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">コピー</button></div>`).join("")||"<p class='muted'>なし</p>"}</div>
