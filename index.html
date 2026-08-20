@@ -48,6 +48,55 @@ label{font-size:12px;color:#aabbd0;font-weight:700;display:block;margin:9px 0 5p
 a.link{color:#7fc5ff}.footer-note{font-size:11px;color:#71859c;margin-top:18px}
 @media(max-width:820px){.sidebar{width:68px;padding:14px 8px}.brand b{font-size:0}.brand b:after{content:"✦";font-size:22px}.brand small{display:none}.nav button{font-size:0;text-align:center;padding:11px 4px}.nav .navIcon{font-size:18px;display:inline-flex;margin:auto}.nav .navText{display:none}.navBtn{justify-content:center;gap:0}.sidebottom{display:none}.content{padding:14px}.stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.grid,.grid3{grid-template-columns:1fr}.topbar{padding:10px}.scenarioSelect{max-width:none}.hero h1{font-size:23px}}
+
+/* v8 responsive */
+html,body{max-width:100%;overflow-x:hidden}
+*{box-sizing:border-box}
+img{max-width:100%;height:auto}
+.row{flex-wrap:wrap}
+.card,.sceneCard,.item{min-width:0;overflow-wrap:anywhere}
+button,.btn{min-height:42px}
+input,select,textarea{max-width:100%}
+.actionBar,.toolbar,.topbar,.header{min-height:52px;align-items:center}
+
+@media(max-width:599px){
+ body{font-size:14px}
+ .app,.container,.main,.content{width:100%;max-width:100%;padding-left:10px;padding-right:10px}
+ .topbar,.header,.toolbar{position:sticky;top:0;z-index:30;background:var(--bg,#07111d);padding:7px 10px}
+ .topbar .row,.header .row,.toolbar .row{width:100%;gap:6px}
+ .topbar .btn,.header .btn,.toolbar .btn{padding:7px 9px;font-size:12px;white-space:nowrap}
+ .topbar select,.header select,.toolbar select{min-width:0;flex:1}
+ .nav,.tabs,.navBar{display:flex;overflow-x:auto;overflow-y:hidden;white-space:nowrap;gap:5px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+ .nav::-webkit-scrollbar,.tabs::-webkit-scrollbar,.navBar::-webkit-scrollbar{display:none}
+ .nav button,.tabs button,.navBar button{flex:0 0 auto}
+ .navLabel{display:none}
+ .hero{padding:16px}
+ .hero h1{font-size:23px}
+ .stats{grid-template-columns:repeat(2,1fr)!important;gap:7px}
+ .stat{padding:10px}
+ .grid,.sessionGrid,.sceneEditGrid{grid-template-columns:1fr!important}
+ .sceneMain,.sessionMain{grid-row:auto}
+ .sceneCard .row.between,.item .row.between{flex-direction:column;align-items:stretch}
+ .sceneCard .row.between>.row,.item .row.between>.row{width:100%;justify-content:flex-end}
+ .sceneArea{min-height:240px}
+ .sessionText{font-size:15px;line-height:1.8}
+ .sessionChecks{display:grid;grid-template-columns:1fr 1fr;width:100%}
+ .modal,.dialog{width:calc(100vw - 20px);max-width:calc(100vw - 20px)}
+}
+
+@media(min-width:600px) and (max-width:1023px){
+ .app,.container,.main,.content{max-width:100%;padding-left:16px;padding-right:16px}
+ .grid{grid-template-columns:1fr 1fr}
+ .sessionGrid{grid-template-columns:1.3fr 1fr}
+ .sceneEditGrid{grid-template-columns:1fr 1fr}
+ .sceneKP{grid-column:1/-1}
+ .nav,.tabs,.navBar{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+}
+
+@media(min-width:1024px){
+ .app,.container,.main,.content{max-width:1200px;margin-left:auto;margin-right:auto}
+ .nav,.tabs,.navBar{overflow:visible}
+}
 </style>
 </head>
 <body>
@@ -127,6 +176,31 @@ function downloadCurrentScenario(){
 }
 function renameScenario(){const s=current(),n=prompt("シナリオ名",s.name);if(n?.trim()){s.name=n.trim();save();drawScenario();render()}}
 function deleteScenario(){if(store.scenarios.length===1)return alert("最後のシナリオは削除できません。");const s=current();if(!confirm(`「${s.name}」を削除しますか？`))return;store.scenarios=store.scenarios.filter(x=>x.id!==s.id);store.currentId=store.scenarios[0].id;save();drawScenario();show("home")}
+
+function deleteScenarioById(id){
+ const idx=scenarios.findIndex(x=>x.id===id); if(idx<0)return;
+ if(!confirm(scenarios.length===1?"最後のシナリオを削除しますか？\n削除後は空の状態になります。":"このシナリオを削除しますか？\n登録した内容も削除されます。"))return;
+ scenarios.splice(idx,1);
+ if(!scenarios.length){const s=blankScenario("新しいシナリオ");scenarios.push(s);currentId=s.id}
+ else currentId=scenarios[Math.max(0,idx-1)].id;
+ saveAll();render();
+}
+function deletePdf(index){
+ const s=current(); if(!s.pdfs[index])return;
+ if(confirm(`「${s.pdfs[index].name||"PDF資料"}」を削除しますか？`)){s.pdfs.splice(index,1);save();render()}
+}
+function deleteActor(type,index){
+ const a=current().actors[type]; if(!a[index])return;
+ if(confirm(`「${a[index].name||"登録データ"}」を削除しますか？`)){a.splice(index,1);save();render()}
+}
+function deletePC(index){
+ const a=current().pcs; if(!a[index])return;
+ if(confirm(`「${a[index].name||"PC"}」を削除しますか？`)){a.splice(index,1);save();render()}
+}
+function deleteHO(index){
+ const a=current().hos; if(!a[index])return;
+ if(confirm(`「${a[index].name||"HO"}」を削除しますか？`)){a.splice(index,1);save();render()}
+}
 function render(){
  repairCurrentData();drawScenario();
  const c=document.getElementById("content");
