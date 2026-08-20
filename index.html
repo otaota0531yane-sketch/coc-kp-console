@@ -17,7 +17,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}
 .sidebar{width:238px;position:sticky;top:0;height:100vh;padding:20px 14px;background:rgba(8,17,31,.96);border-right:1px solid var(--line);display:flex;flex-direction:column}
 .brand{padding:4px 10px 22px}.brand b{font-size:18px;letter-spacing:.08em}.brand small{display:block;color:var(--muted);margin-top:5px}
 .nav{display:grid;gap:5px}.nav button{background:transparent;border:1px solid transparent;color:#aebed1;text-align:left;border-radius:10px;padding:10px 12px}.nav button.active{background:#122943;border-color:#20456b;color:#fff}.nav button:hover{background:#102238}
-.navBtn{display:flex;align-items:center;gap:10px;width:100%}
+.navBtn{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;touch-action:manipulation}
 .sceneList{display:grid;gap:10px}.sceneCard{background:#0d1b2a;border:1px solid #213a50;border-radius:14px;padding:14px 16px}.sceneCard h3{margin:0 0 4px}.sceneNo{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:9px;background:#162b3e;color:#9ed5ff;font-weight:700}.scenePreview{margin-top:12px;display:grid;gap:7px;color:#b9c8d6;font-size:13px}.scenePreview>div{display:flex;gap:8px;line-height:1.5}.sceneTag{display:inline-flex;align-items:center;justify-content:center;min-width:48px;height:22px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:700;flex:none}.bodyTag{background:#173a59;color:#a9d9ff}.infoTag{background:#173d32;color:#a8e5ca}.kpTag{background:#452832;color:#ffc0c7}.sceneEditGrid{display:grid;grid-template-columns:1fr;gap:12px}.sceneArea{min-height:300px}.sceneBody{border-color:#28577d}.sceneInfo{border-color:#2b6855}.sceneKP{border-color:#6c3040}.pdfItem{padding:14px}.previewActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid #213a50}.pdfPages{display:grid;gap:12px}.pdfPage{background:#0d1b2a;border:1px solid #293e52;border-radius:14px;padding:14px}.pageLabel{font-size:11px;font-weight:800;letter-spacing:.12em;color:#9ed5ff}.pdfPreviewText{width:100%;min-height:360px;margin:10px 0;resize:vertical;background:#f7f7f3;color:#17212b;border:1px solid #c9d0d6;font-family:inherit;line-height:1.7}.pdfPreviewText:focus{outline:2px solid #6aa4d0;outline-offset:1px}
 @media(min-width:900px){.sceneEditGrid{grid-template-columns:1.4fr 1fr 1fr}.sceneArea{min-height:420px}}
 @media(max-width:820px){.sceneCard .row.between{align-items:flex-start;gap:8px}.sceneCard .row.between>.row{flex-wrap:wrap;justify-content:flex-end}.previewActions{position:sticky;top:0;z-index:5;background:#0b1622;padding:10px 0}.pdfPreviewText{min-height:420px}}
@@ -97,6 +97,58 @@ input,select,textarea{max-width:100%}
  .app,.container,.main,.content{max-width:1200px;margin-left:auto;margin-right:auto}
  .nav,.tabs,.navBar{overflow:visible}
 }
+
+/* v9 navigation + topbar layout */
+@media(max-width:599px){
+ .app{display:block;min-height:100vh}
+ .sidebar{
+   position:sticky;top:0;z-index:50;width:100%;height:auto;
+   padding:0;background:rgba(8,17,31,.98);border-right:0;border-bottom:1px solid var(--line);
+   display:block;
+ }
+ .brand{display:none}
+ .nav{
+   display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;
+   padding:8px 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+ }
+ .nav::-webkit-scrollbar{display:none}
+ .navBtn{
+   width:auto!important;min-width:48px;flex:0 0 auto;
+   justify-content:center;padding:9px 10px!important;gap:0!important;
+ }
+ .navText{display:none!important}
+ .navIcon{font-size:18px}
+ .sidebottom{display:none}
+ .main{width:100%;min-width:0}
+ .topbar{
+   position:sticky;top:53px;z-index:40;
+   padding:8px 10px;display:grid;grid-template-columns:1fr 1fr;
+   gap:7px;background:rgba(8,17,31,.96);
+ }
+ .scenarioSelect{grid-column:1/-1;width:100%;max-width:none;min-height:42px}
+ .topbar .btn{min-height:42px;padding:8px 10px;font-size:12px}
+ .content{padding:12px 10px}
+}
+@media(min-width:600px) and (max-width:1023px){
+ .sidebar{
+   width:74px;padding:10px 8px;
+ }
+ .brand{padding:5px 0 14px;text-align:center}
+ .brand b{font-size:0}
+ .brand b:after{content:"✦";font-size:22px}
+ .brand small{display:none}
+ .nav button{justify-content:center;padding:11px 7px}
+ .navText{display:none}
+ .navIcon{font-size:18px}
+ .sidebottom button{font-size:0;padding:10px}
+ .sidebottom button:before{font-size:17px}
+ .topbar{padding:10px 12px;display:grid;grid-template-columns:minmax(150px,1fr) repeat(4,auto);gap:7px}
+ .topbar .btn{padding:8px 10px}
+ .content{padding:16px}
+}
+@media(min-width:1024px){
+ .sidebar{width:238px}
+}
 </style>
 </head>
 <body>
@@ -149,7 +201,11 @@ function drawNav(){
    <span class="navIcon">${n[1]}</span><span class="navText">${n[2]}</span>
  </button>`).join("")
 }
-function drawScenario(){document.getElementById("scenarioSelect").innerHTML=store.scenarios.map(s=>`<option value="${esc(s.id)}" ${s.id===store.currentId?'selected':''}>${esc(s.name)}</option>`).join("")}
+function drawScenario(){
+ const el=document.getElementById("scenarioSelect");
+ if(!el)return;
+ el.innerHTML=store.scenarios.map(s=>`<option value="${esc(s.id)}" ${s.id===store.currentId?'selected':''}>${esc(s.name)}</option>`).join("");
+}
 function show(t){tab=t;drawNav();render()}
 function repairCurrentData(){
  const s=current();
@@ -159,7 +215,7 @@ function repairCurrentData(){
  s.session.currentScene=Number.isInteger(s.session.currentScene)?s.session.currentScene:0;s.session.checks??={};
  for(const x of s.scenes){x.title??="無題";x.body??="";x.info??="";x.kp??="";x.tags??=[];x.checks??={body:false,info:false,judge:false,next:false}}
 }function switchScenario(id){if(store.scenarios.some(s=>s.id===id)){store.currentId=id;save();render()}}
-function newScenario(){const n=prompt("シナリオ名","新しいシナリオ");if(!n?.trim())return;const s=blankScenario(n.trim());store.scenarios.push(s);store.currentId=s.id;save();drawScenario();show("home")}
+function newScenario(){const n=prompt("シナリオ名","新しいシナリオ");if(!n?.trim())return;const s=blankScenario(n.trim());store.store.scenarios.push(s);store.currentId=s.id;save();drawScenario();show("home")}
 function saveCurrentScenario(){
  save();
  drawScenario();
@@ -175,16 +231,15 @@ function downloadCurrentScenario(){
  toast("シナリオファイルを保存しました");
 }
 function renameScenario(){const s=current(),n=prompt("シナリオ名",s.name);if(n?.trim()){s.name=n.trim();save();drawScenario();render()}}
-function deleteScenario(){if(store.scenarios.length===1)return alert("最後のシナリオは削除できません。");const s=current();if(!confirm(`「${s.name}」を削除しますか？`))return;store.scenarios=store.scenarios.filter(x=>x.id!==s.id);store.currentId=store.scenarios[0].id;save();drawScenario();show("home")}
-
-function deleteScenarioById(id){
- const idx=scenarios.findIndex(x=>x.id===id); if(idx<0)return;
- if(!confirm(scenarios.length===1?"最後のシナリオを削除しますか？\n削除後は空の状態になります。":"このシナリオを削除しますか？\n登録した内容も削除されます。"))return;
- scenarios.splice(idx,1);
- if(!scenarios.length){const s=blankScenario("新しいシナリオ");scenarios.push(s);currentId=s.id}
- else currentId=scenarios[Math.max(0,idx-1)].id;
- saveAll();render();
+function deleteScenario(){
+ const s=current();
+ if(!confirm(`「${s.name}」を削除しますか？\n登録したPDF・シーン・キャラクター情報も削除されます。`))return;
+ store.scenarios=store.scenarios.filter(x=>x.id!==s.id);
+ if(!store.scenarios.length){const n=blankScenario("新しいシナリオ");store.scenarios=[n];store.currentId=n.id}
+ else store.currentId=store.scenarios[0].id;
+ save();drawScenario();show("home")
 }
+
 function deletePdf(index){
  const s=current(); if(!s.pdfs[index])return;
  if(confirm(`「${s.pdfs[index].name||"PDF資料"}」を削除しますか？`)){s.pdfs.splice(index,1);save();render()}
