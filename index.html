@@ -199,7 +199,7 @@ input,select,textarea{max-width:100%}
  .originalCanvasWrap{padding:4px}
  .originalPageHead{padding:4px 5px 7px}
 }
-</style>
+.iaCharaHint{margin:6px 0 10px}</style>
 </head>
 <body>
 <div class="app">
@@ -380,6 +380,28 @@ function deleteHO(index){
  const a=current().hos; if(!a[index])return;
  if(confirm(`「${a[index].name||"HO"}」を削除しますか？`)){a.splice(index,1);save();render()}
 }
+
+function normalizeIaCharaUrl(raw){
+ const v=String(raw||"").trim();
+ if(!v)return "";
+ return /^https?:\/\//i.test(v)?v:"https://"+v;
+}
+function setIaCharaUrl(index){
+ const s=current(),pc=(s.pcs||[])[index];
+ if(!pc)return;
+ const old=pc.iaCharaUrl||"";
+ const v=prompt("いあきゃらのキャラクターURLを入力してください",old);
+ if(v===null)return;
+ const url=normalizeIaCharaUrl(v);
+ if(url && !/^https?:\/\/.+/i.test(url)){toast("URLの形式を確認してください");return}
+ pc.iaCharaUrl=url;
+ save(); render();
+}
+function openIaCharaUrl(index){
+ const s=current(),pc=(s.pcs||[])[index],url=normalizeIaCharaUrl(pc?.iaCharaUrl);
+ if(!url)return toast("いあきゃらのURLを登録してください");
+ window.open(url,"_blank","noopener,noreferrer");
+}
 function render(){
  repairCurrentData();drawScenario();
  const c=document.getElementById("content");
@@ -451,7 +473,7 @@ function sDelete(type,i){if(confirm("削除しますか？")){current()[type].sp
 function pc(c){
  const s=current();c.innerHTML=`<div class="card" style="border-color:#28577d"><div class="eyebrow">CHARACTERS</div><div class="row between"><div><h2>キャラクター</h2><p class="muted small">キャラシのページURLを登録して、ここからすぐ開けます。</p></div><span class="badge pc">♙ キャラシ</span></div>
  <div class="notice">いあきゃらのURLを貼り付けて保存できます。キャラシの内容をこのツールが取得することはありません。</div></div>
- <div class="grid">${s.pcs.map((p,i)=>`<div class="card" style="border-color:#234e70"><div class="row between"><h3>${esc(p.name)}</h3><span class="badge pc">キャラクター</span></div>
+ <div class="grid">${s.pcs.map((p,i)=>`<div class="card" style="border-color:#234e70"><div class="row between"><h3>${esc(p.name)}</h3><span class="badge pc">キャラクター</span></div><div class="row" style="margin-top:6px"><button class="btn ghost" onclick="setIaCharaUrl(i)">URL登録</button><button class="btn ghost" onclick="openIaCharaUrl(i)">いあきゃらを開く</button></div>
  <label>キャラクター名</label><input value="${esc(p.name)}" oninput="current().pcs[${i}].name=this.value;save()">
  <label>いあきゃらのURL</label><input value="${esc(p.url)}" placeholder="https://..." oninput="current().pcs[${i}].url=this.value;save()">
  <div class="row">${p.url?`<a class="link" href="${esc(p.url)}" target="_blank" rel="noopener">→ いあきゃらを開く</a>`:"<span class='muted small'>URLを登録すると、ここに開くボタンが表示されます。</span>"}</div>
