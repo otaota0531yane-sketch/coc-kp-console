@@ -199,7 +199,22 @@ input,select,textarea{max-width:100%}
  .originalCanvasWrap{padding:4px}
  .originalPageHead{padding:4px 5px 7px}
 }
-.iaCharaHint{margin:6px 0 10px}</style>
+
+.iaCharaBox{margin-top:12px;padding:10px;border:1px solid #315b7c;border-radius:10px;background:rgba(30,75,105,.12)}
+.iaCharaBox label{display:block;font-weight:700;margin-bottom:5px}
+.pdfViewerModal{position:fixed;inset:0;z-index:9999;background:#07111d;color:#eaf2ff;display:flex;flex-direction:column}
+.pdfViewerHead{padding:10px 14px;border-bottom:1px solid #29445e;background:#0b1726;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.pdfViewerButtons{display:flex;gap:7px;flex-wrap:wrap}
+.pdfOriginalPages{flex:1;overflow:auto;padding:18px 10px 50px;display:flex;flex-direction:column;align-items:center;gap:18px}
+.originalPage{width:min(100%,960px);background:#101c2a;border:1px solid #294764;border-radius:12px;padding:7px}
+.originalPageHead{display:flex;justify-content:space-between;padding:5px 7px 8px}
+.originalCanvasWrap{display:flex;justify-content:center;overflow:auto;background:#293644;border-radius:8px;padding:6px}
+.pageStage{position:relative;flex:none;background:#fff;box-shadow:0 2px 18px #0007}
+.pageStage canvas{position:absolute;inset:0}
+.pdfTextLayer{position:absolute;inset:0;overflow:hidden;opacity:.01;cursor:text;user-select:text;-webkit-user-select:text}
+.pdfTextLayer span{position:absolute;white-space:pre;user-select:text;-webkit-user-select:text;color:#000}
+@media(max-width:599px){.pdfViewerHead{flex-direction:column;align-items:stretch;padding:8px}.pdfViewerButtons{overflow-x:auto;flex-wrap:nowrap}.pdfViewerButtons .btn{white-space:nowrap}.pdfOriginalPages{padding:10px 5px 40px}.originalPage{width:100%;padding:4px}}
+</style>
 </head>
 <body>
 <div class="app">
@@ -247,68 +262,38 @@ async function openOriginalPDF(pdfIndex,sourceIndex=0){
  if(!file){toast("このPDFの原本は保存されていません。PDFを登録し直してください。");return}
  document.getElementById("pdfViewerModal")?.remove();
  const m=document.createElement("div");m.id="pdfViewerModal";m.className="pdfViewerModal";
- m.innerHTML=`<div class="pdfViewerHead"><div class="pdfViewerTitle"><b>${esc(file.name||p.name)}</b><div class="small muted">原本を確認しながら、文章を指で長押し・ドラッグして選択できます。</div></div>
- <div class="pdfViewerButtons"><button class="btn" onclick="extractViewerSelection()">選択範囲を抽出</button><button class="btn ghost" onclick="copyViewerSelection()">選択範囲をコピー</button><button class="btn ghost" onclick="closePDFViewer()">閉じる</button></div></div>
- <div class="pdfViewerTools"><span id="pdfOriginalStatus">読み込み中…</span><span class="small muted">PDF内の文字データのみを抽出します</span><button class="btn ghost" onclick="selectAllOriginalPages(true)">全ページ選択</button><button class="btn ghost" onclick="selectAllOriginalPages(false)">選択解除</button><button class="btn ghost" onclick="extractSelectedOriginalPages(${pdfIndex},${sourceIndex},false)">選択ページを抽出</button></div>
- <div id="pdfOriginalPages" class="pdfOriginalPages"></div>`;
- m.dataset.pdfIndex=pdfIndex;m.dataset.sourceIndex=sourceIndex;
- document.body.appendChild(m);
+ m.innerHTML=`<div class="pdfViewerHead"><div><b>${esc(file.name||p.name)}</b><div class="small muted">原本上の文章をドラッグ（スマホは長押し）して選択できます。</div></div><div class="pdfViewerButtons"><button class="btn" onclick="extractViewerSelection()">選択範囲を抽出</button><button class="btn ghost" onclick="copyViewerSelection()">コピー</button><button class="btn ghost" onclick="closePDFViewer()">閉じる</button></div></div><div id="pdfOriginalPages" class="pdfOriginalPages"></div>`;
+ m.dataset.pdfIndex=pdfIndex;m.dataset.sourceIndex=sourceIndex;document.body.appendChild(m);
  const url=URL.createObjectURL(file);m.dataset.url=url;
  try{
   const pdfjs=await loadPDFjs(),doc=await pdfjs.getDocument({url}).promise,wrap=m.querySelector("#pdfOriginalPages");
   for(let n=1;n<=doc.numPages;n++){
-   const holder=document.createElement("section");holder.className="originalPage";holder.dataset.page=n;
-   holder.innerHTML=`<div class="originalPageHead"><label><input class="originalPageCheck" type="checkbox" checked> <b>PAGE ${String(n).padStart(3,"0")}</b></label><span class="small muted">文章を選択できます</span></div><div class="originalCanvasWrap"><div class="pageStage"><canvas></canvas><div class="pdfTextLayer" aria-label="PDF text selection layer"></div></div></div>`;
-   wrap.appendChild(holder);
-   const page=await doc.getPage(n),base=page.getViewport({scale:1}),maxW=Math.max(280,Math.min(wrap.clientWidth-20,900)),scale=Math.min(1.55,maxW/base.width),vp=page.getViewport({scale});
-   const stage=holder.querySelector(".pageStage"),canvas=holder.querySelector("canvas"),layer=holder.querySelector(".pdfTextLayer");
+   const sec=document.createElement("section");sec.className="originalPage";
+   sec.innerHTML=`<div class="originalPageHead"><b>PAGE ${String(n).padStart(3,"0")}</b><span class="small muted">文章選択可能</span></div><div class="originalCanvasWrap"><div class="pageStage"><canvas></canvas><div class="pdfTextLayer"></div></div></div>`;
+   wrap.appendChild(sec);
+   const page=await doc.getPage(n),base=page.getViewport({scale:1}),maxW=Math.min(Math.max(280,wrap.clientWidth-28),900),scale=Math.min(1.5,maxW/base.width),vp=page.getViewport({scale});
+   const stage=sec.querySelector(".pageStage"),canvas=sec.querySelector("canvas"),layer=sec.querySelector(".pdfTextLayer");
    stage.style.width=vp.width+"px";stage.style.height=vp.height+"px";canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);
    await page.render({canvasContext:canvas.getContext("2d"),viewport:vp}).promise;
    const tc=await page.getTextContent();
-   for(const item of tc.items){
-     const str=String(item.str||"");if(!str.trim())continue;
-     const tr=item.transform||[1,0,0,1,0,0],pt=vp.convertToViewportPoint(tr[4],tr[5]),fs=Math.max(7,Math.hypot(tr[0]||0,tr[1]||0)*scale);
-     const span=document.createElement("span");span.textContent=str;span.style.left=pt[0]+"px";span.style.top=(pt[1]-fs)+"px";span.style.fontSize=fs+"px";span.style.lineHeight="1";span.dataset.raw=str;layer.appendChild(span);
+   for(const it of tc.items){
+    const str=String(it.str||"");if(!str.trim())continue;
+    const tr=it.transform||[1,0,0,1,0,0],pt=vp.convertToViewportPoint(tr[4],tr[5]),fs=Math.max(7,Math.hypot(tr[0]||0,tr[1]||0)*scale);
+    const sp=document.createElement("span");sp.textContent=str;sp.style.left=pt[0]+"px";sp.style.top=(pt[1]-fs)+"px";sp.style.fontSize=fs+"px";layer.appendChild(sp);
    }
-   m.querySelector("#pdfOriginalStatus").textContent=`${n} / ${doc.numPages}ページ`;
   }
-  m.querySelector("#pdfOriginalStatus").textContent=`全${doc.numPages}ページ表示`;
- }catch(e){console.error(e);m.querySelector("#pdfOriginalStatus").textContent="PDFを表示できませんでした。"}
+ }catch(e){console.error(e);toast("PDFを表示できませんでした")}
 }
 function viewerSelection(){
- const sel=window.getSelection();if(!sel||sel.isCollapsed)return "";
- const root=document.getElementById("pdfOriginalPages");if(!root||!root.contains(sel.anchorNode)||!root.contains(sel.focusNode))return "";
+ const sel=window.getSelection(),root=document.getElementById("pdfOriginalPages");
+ if(!sel||sel.isCollapsed||!root||!root.contains(sel.anchorNode)||!root.contains(sel.focusNode))return "";
  return sel.toString().replace(/\u00a0/g," ").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
 }
 function copyViewerSelection(){const t=viewerSelection();if(!t)return toast("原本の文章を選択してください");copyText(t)}
 function extractViewerSelection(){
  const t=viewerSelection();if(!t)return toast("原本の文章を選択してください");
- const m=document.getElementById("pdfViewerModal"),pdfIndex=Number(m.dataset.pdfIndex),p=current().pdfs[pdfIndex];
- p.selectedExtracts??=[];p.selectedExtracts.push({text:t,at:Date.now()});save();
- const s=current(),field=prompt("抽出先を選んでください\n1：本文\n2：公開情報\n3：KP情報\n空欄：抽出結果だけ保存","3");
- if(!field){toast("選択範囲を保存しました");return}
- const map={1:"body",2:"info",3:"kp"},target=map[field.trim()];if(!target)return;
- const n=Number(prompt(`どのシーンの${target==="body"?"本文":target==="info"?"公開情報":"KP情報"}へ追加しますか？\n番号（1〜${s.scenes.length}）`,String(s.scenes.length||1)))-1;
- if(!Number.isInteger(n)||n<0||n>=s.scenes.length)return;
- s.scenes[n][target]=(s.scenes[n][target]?s.scenes[n][target]+"\n\n":"")+t;save();toast(`シーン${n+1}へ追加しました`);
+ const s=current();s.selectedPDFExtracts??=[];s.selectedPDFExtracts.push({text:t,at:Date.now()});save();toast("選択した文章を抽出結果として保存しました");
 }
-function selectAllOriginalPages(v){document.querySelectorAll("#pdfOriginalPages .originalPageCheck").forEach(x=>x.checked=v)}
-async function extractOneOriginalPage(pdfIndex,sourceIndex,pageNo,ocr){
- const p=current().pdfs[pdfIndex],id=p?.originalIds?.[sourceIndex],file=await getPDFOriginal(id);if(!file)return;
- const bytes=new Uint8Array(await file.arrayBuffer()),r=await extractPDFWithPDFJS(bytes,ocr,()=>{}),found=r.pageData?.find(x=>x.page===pageNo),text=found?.text||"";
- if(!text)return toast("このページから文章を抽出できませんでした");
- p.pageData??=[];const existing=p.pageData.findIndex(x=>x.sourcePage===pageNo&&x.source===file.name);
- if(existing>=0)p.pageData[existing].text=text;else p.pageData.push({page:pageNo,text,source:file.name,sourcePage:pageNo});
- p.text=p.pageData.map(x=>`【${x.source||file.name} / ${x.sourcePage||x.page}ページ】\n${x.text}`).join("\n\n");p.pages=p.pageData.length;save();toast(`ページ${pageNo}を抽出しました`);
-}
-async function extractSelectedOriginalPages(pdfIndex,sourceIndex,ocr){
- const checks=[...document.querySelectorAll("#pdfOriginalPages .originalPageCheck:checked")];if(!checks.length)return toast("抽出するページを選択してください");
- const p=current().pdfs[pdfIndex],id=p?.originalIds?.[sourceIndex],file=await getPDFOriginal(id);if(!file)return;
- const r=await extractPDFWithPDFJS(new Uint8Array(await file.arrayBuffer()),ocr,()=>{}),nums=new Set(checks.map(x=>Number(x.closest(".originalPage").dataset.page))),selected=(r.pageData||[]).filter(x=>nums.has(x.page));
- p.pageData??=[];for(const x of selected){const j=p.pageData.findIndex(y=>(y.sourcePage||y.page)===x.page&&y.source===file.name);if(j>=0)p.pageData[j].text=x.text;else p.pageData.push({page:x.page,text:x.text,source:file.name,sourcePage:x.page})}
- p.text=p.pageData.map(x=>`【${x.source||file.name} / ${x.sourcePage||x.page}ページ】\n${x.text}`).join("\n\n");p.pages=p.pageData.length;save();toast(`${selected.length}ページを抽出しました`);
-}
-function showPDFViewer(url,name){}
 function closePDFViewer(){const m=document.getElementById("pdfViewerModal");if(!m)return;const u=m.dataset.url;m.remove();if(u)URL.revokeObjectURL(u)}
 
 function current(){return store.scenarios.find(s=>s.id===store.currentId)||store.scenarios[0]}
@@ -387,20 +372,50 @@ function normalizeIaCharaUrl(raw){
  return /^https?:\/\//i.test(v)?v:"https://"+v;
 }
 function setIaCharaUrl(index){
- const s=current(),pc=(s.pcs||[])[index];
- if(!pc)return;
- const old=pc.iaCharaUrl||"";
- const v=prompt("いあきゃらのキャラクターURLを入力してください",old);
+ const s=current(),pc=(s.pcs||[])[index]; if(!pc)return;
+ const v=prompt("いあきゃらのキャラクターURLを入力してください",pc.iaCharaUrl||pc.url||"");
  if(v===null)return;
- const url=normalizeIaCharaUrl(v);
- if(url && !/^https?:\/\/.+/i.test(url)){toast("URLの形式を確認してください");return}
- pc.iaCharaUrl=url;
- save(); render();
+ const u=normalizeIaCharaUrl(v);
+ if(u&&!/^https?:\/\/.+/i.test(u))return toast("URLの形式を確認してください");
+ pc.iaCharaUrl=u;pc.url=u;save();render();
 }
 function openIaCharaUrl(index){
- const s=current(),pc=(s.pcs||[])[index],url=normalizeIaCharaUrl(pc?.iaCharaUrl);
- if(!url)return toast("いあきゃらのURLを登録してください");
- window.open(url,"_blank","noopener,noreferrer");
+ const pc=current().pcs?.[index],u=normalizeIaCharaUrl(pc?.iaCharaUrl||pc?.url);
+ if(!u)return toast("いあきゃらのURLを登録してください");
+ window.open(u,"_blank","noopener,noreferrer");
+}
+
+function variableNames(){
+ const s=current();s.variables??={ho:[],pc:[],kpc:[]};
+ return s.variables;
+}
+function addVariable(kind){
+ const v=prompt(kind==="ho"?"HO名を入力（例：東、視線）":kind==="pc"?"PC名を入力（例：東、視線）":"KPCの変数名を入力", "");
+ if(v===null||!v.trim())return;
+ const key=v.trim(),a=variableNames()[kind];
+ if(!a.includes(key))a.push(key);
+ save();render();
+}
+function removeVariable(kind,i){variableNames()[kind].splice(i,1);save();render()}
+function openVariableSettings(){
+ const s=current(),v=variableNames();
+ let msg="変数化する名前を登録します。\\n\\nHO: "+(v.ho.join(", ")||"なし")+"\\nPC: "+(v.pc.join(", ")||"なし")+"\\nKPC: "+(v.kpc.join(", ")||"なし");
+ alert(msg+"\\n\\n本文では、登録した名前を使って「HO東」「PC東」「KPC」などを {HO東} / {PC東} / {KPC} に変換できます。");
+}
+function variableizeText(text){
+ const v=variableNames(), names=[];
+ v.ho.forEach(x=>names.push("HO"+x)); v.pc.forEach(x=>names.push("PC"+x)); v.kpc.forEach(x=>names.push(x.startsWith("KPC")?x:"KPC"+x));
+ names.sort((a,b)=>b.length-a.length);
+ let out=String(text||"");
+ for(const n of names){
+  const esc=n.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  out=out.replace(new RegExp("(?<!\\{)"+esc+"(?!\\})","g"),"{"+n+"}");
+ }
+ return out;
+}
+function variableizeScene(sceneIndex,field){
+ const s=current(),sc=s.scenes?.[sceneIndex];if(!sc)return;
+ sc[field]=variableizeText(sc[field]||"");save();render();toast("ココフォリア変数に変換しました");
 }
 function render(){
  repairCurrentData();drawScenario();
@@ -473,12 +488,12 @@ function sDelete(type,i){if(confirm("削除しますか？")){current()[type].sp
 function pc(c){
  const s=current();c.innerHTML=`<div class="card" style="border-color:#28577d"><div class="eyebrow">CHARACTERS</div><div class="row between"><div><h2>キャラクター</h2><p class="muted small">キャラシのページURLを登録して、ここからすぐ開けます。</p></div><span class="badge pc">♙ キャラシ</span></div>
  <div class="notice">いあきゃらのURLを貼り付けて保存できます。キャラシの内容をこのツールが取得することはありません。</div></div>
- <div class="grid">${s.pcs.map((p,i)=>`<div class="card" style="border-color:#234e70"><div class="row between"><h3>${esc(p.name)}</h3><span class="badge pc">キャラクター</span></div><div class="row" style="margin-top:6px"><button class="btn ghost" onclick="setIaCharaUrl(i)">URL登録</button><button class="btn ghost" onclick="openIaCharaUrl(i)">いあきゃらを開く</button></div>
+ <div class="grid">${s.pcs.map((p,i)=>`<div class="card" style="border-color:#234e70"><div class="row between"><h3>${esc(p.name)}</h3><span class="badge pc">キャラクター</span></div>
  <label>キャラクター名</label><input value="${esc(p.name)}" oninput="current().pcs[${i}].name=this.value;save()">
  <label>いあきゃらのURL</label><input value="${esc(p.url)}" placeholder="https://..." oninput="current().pcs[${i}].url=this.value;save()">
  <div class="row">${p.url?`<a class="link" href="${esc(p.url)}" target="_blank" rel="noopener">→ いあきゃらを開く</a>`:"<span class='muted small'>URLを登録すると、ここに開くボタンが表示されます。</span>"}</div>
  <label>KP確認メモ</label><textarea oninput="current().pcs[${i}].memo=this.value;save()">${esc(p.memo)}</textarea>
- <button class="btn danger" onclick="sDelete('pcs',${i})">削除</button></div>`).join("")||`<div class="empty">キャラクターがまだありません。</div>`}</div>`
+ <button class="btn danger" onclick="sDelete('pcs',${i})">削除</button></div><div class="iaCharaBox"><label>いあきゃらURL</label><input type="url" value="${esc(p.iaCharaUrl||p.url||"")}" placeholder="https://iachara.com/..." oninput="current().pcs[${i}].iaCharaUrl=this.value;current().pcs[${i}].url=this.value;save()"><div class="row"><button class="btn ghost" onclick="setIaCharaUrl(${i})">URLを登録</button><button class="btn ghost" onclick="openIaCharaUrl(${i})">いあきゃらを開く</button></div></div>`).join("")||`<div class="empty">キャラクターがまだありません。</div>`}</div>`
 }
 function addPC(){current().pcs.push({name:"新しいキャラクター",url:"",memo:""});save();render()}
 function actor(c,type){
@@ -632,105 +647,55 @@ async function readPDFs(e){
  }catch(err){console.error(err);st.textContent="PDFを読み込めませんでした。"}
 }
 async function extractPDFWithPDFJS(bytes,doOCR,progress){
- const pdfjs=await loadPDFjs();
- const pdf=await pdfjs.getDocument({data:bytes}).promise;
- const pages=[],pageData=[]; let worker=null;
- const cleanToken=s=>String(s||"").replace(/\s+/g,"").replace(/[‐‑–—−]/g,"-");
- const isPageMark=(s,y,h)=>{
-   const t=cleanToken(s);
-   if(!t)return true;
-   if(/^(?:0*\d{1,4})(?:P|p)$/.test(t))return true;
-   if(/^(?:P|p)?0*\d{1,4}(?:P|p)?$/.test(t) && (y<h*.10||y>h*.90))return true;
-   if(/^(?:page|Page|PAGE)?0*\d{1,4}(?:[\/／]0*\d{1,4})?$/.test(t) && (y<h*.12||y>h*.88))return true;
-   return false;
+ const pdfjs=await loadPDFjs(),pdf=await pdfjs.getDocument({data:bytes}).promise,pages=[],pageData=[];
+ const clean=s=>String(s||"").replace(/\u00a0/g," ").replace(/[ \t]+/g," ").trim();
+ const isMark=(s,y,h)=>{
+  const t=clean(s).replace(/\s/g,"");
+  return /^(?:0*\d{1,4}P|P0*\d{1,4})$/i.test(t) ||
+   (/^(?:Page|PAGE|p)?0*\d{1,4}(?:[\/／]0*\d{1,4})?$/.test(t)&&(y<h*.12||y>h*.88));
  };
- const normalizeRows=items=>{
-   const rows=[];
-   for(const it of items){
-     let row=rows.find(r=>Math.abs(r.y-it.y)<Math.max(3,it.fs*.35));
-     if(!row){row={y:it.y,items:[]};rows.push(row)} row.items.push(it);
-   }
-   rows.sort((x,y)=>y.y-x.y);
-   const out=[];
-   for(const r of rows){
-     r.items.sort((x,y)=>x.x-y.x);
-     let line="";
-     for(let i=0;i<r.items.length;i++){
-       const it=r.items[i],prev=r.items[i-1];
-       if(prev){
-         const gap=it.x-(prev.x+prev.w);
-         const threshold=Math.max(prev.fs,it.fs)*.35;
-         if(gap>threshold && !/[（「『【［\(]$/.test(line) && !/^[、。，．」』】］\)]/.test(it.str)) line+=" ";
-       }
-       line+=it.str;
-     }
-     line=line.replace(/[ \t]+/g," ").trim();
-     if(line)out.push(line);
-   }
-   // Join lines that are clearly sentence-wrapped. Preserve headings/list-like lines.
-   const joined=[];
-   for(const line of out){
-     if(!joined.length){joined.push(line);continue}
-     const prev=joined[joined.length-1];
-     const shouldJoin =
-       prev.length>0 &&
-       !/[。！？!?：:]$/.test(prev) &&
-       !/^[・●○◆◇■□▶▷★☆\-\d０-９]/.test(line) &&
-       !/^(?:【|「|『|［|\[)/.test(line) &&
-       !/[。！？!?]$/.test(line) &&
-       (prev.length<55 || /[ぁ-んァ-ヶ一-龥]$/.test(prev));
-     if(shouldJoin) joined[joined.length-1]=prev+line;
-     else joined.push(line);
-   }
-   return joined.join("\n");
- };
- if(false && doOCR){
-   if(!window.Tesseract)throw Error("OCR library unavailable");
-   progress(0.02,"PDFを解析しています…");
-   worker=await Tesseract.createWorker("jpn+eng",1,{logger:m=>{
-     if(m.status==="recognizing text"){
-       const pct=Number(m.progress||0);progress(Math.min(.98,(pageData.length+pct)/pdf.numPages),"解析中…");
-     }
-   }});
- }
- try{
-  for(let n=1;n<=pdf.numPages;n++){
-   progress((n-1)/pdf.numPages,`PDFを解析中… ${n}/${pdf.numPages}ページ`);
-   const page=await pdf.getPage(n),tc=await page.getTextContent(),vp=page.getViewport({scale:1}),h=vp.height;
-   const items=tc.items.map(x=>{
-     const tr=x.transform||[1,0,0,1,0,0],fs=Math.max(1,Math.hypot(tr[0]||0,tr[1]||0));
-     return {str:String(x.str||""),x:Number(tr[4]||0),y:Number(tr[5]||0),w:Number(x.width||0),fs};
-   }).filter(x=>x.str.trim());
-   const kept=items.filter(x=>{
-     const t=cleanToken(x.str);
-     if(isPageMark(x.str,x.y,h))return false;
-     // Tiny isolated text is usually page furniture / decorative labels.
-     if(x.fs<6.2 && x.str.trim().length<=10)return false;
-     // Common decorative page labels.
-     if(/^(?:0*\d{2,4})P$/.test(t)||/^(?:P|p)0*\d{2,4}$/.test(t))return false;
-     return true;
-   });
-   const text=normalizeRows(kept).trim();
-   let combined=text,ocr="";
-   if(doOCR){
-     // OCR only when the native PDF text is missing/very sparse; this avoids
-     // pulling lettering from illustrations when a proper text layer exists.
-     if(kept.length<8 || text.length<80){
-       const viewport=page.getViewport({scale:1.6}),canvas=document.createElement("canvas");
-       canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
-       await page.render({canvasContext:canvas.getContext("2d",{willReadFrequently:true}),viewport}).promise;
-       const r=await worker.recognize(canvas);ocr=(r.data?.text||"").trim();
-       // Strip obvious page marks from OCR too.
-       ocr=ocr.split(/\r?\n/).filter(line=>!isPageMark(line,0,h)&&!/^(?:0*\d{2,4})P$/i.test(cleanToken(line))).join("\n").trim();
-       if(!text)combined=ocr; else if(ocr.length>text.length*1.8)combined=text+"\n"+ocr;
-       canvas.width=canvas.height=1;
-     }
-   }
-   pages.push(combined||"（このページから本文テキストを抽出できませんでした）");
-   pageData.push({page:n,text:combined||"",hasOCR:!!ocr});
+ const rebuild=items=>{
+  const rows=[];
+  for(const it of items){
+   let r=rows.find(x=>Math.abs(x.y-it.y)<Math.max(3,it.fs*.35));
+   if(!r){r={y:it.y,items:[]};rows.push(r)} r.items.push(it);
   }
- }finally{if(worker)await worker.terminate()}
- progress(1,"読み込み完了"); return {pages,pageData};
+  rows.sort((a,b)=>b.y-a.y);
+  const lines=rows.map(r=>{
+   r.items.sort((a,b)=>a.x-b.x);let line="";
+   for(let i=0;i<r.items.length;i++){
+    const it=r.items[i],pr=r.items[i-1];
+    if(pr){
+     const gap=it.x-(pr.x+pr.w);
+     if(gap>Math.max(pr.fs,it.fs)*.35&&!/[「『（【［(]$/.test(line)&&!/[、。，．」』）】］)]/.test(it.str[0]||""))line+=" ";
+    }
+    line+=it.str;
+   }
+   return clean(line);
+  }).filter(Boolean);
+  const out=[];
+  for(const line of lines){
+   if(!out.length){out.push(line);continue}
+   const prev=out[out.length-1];
+   const soft=!/[。！？!?：:」』）】]$/.test(prev)&&
+    !/^[・●○◆◇■□▶▷★☆\-—–]/.test(line)&&
+    !/^\d+[.)、]/.test(line)&&
+    !/^(?:「|『|【|［|\[)/.test(line)&&
+    !/[。！？!?]$/.test(line)&&prev.length<70;
+   if(soft)out[out.length-1]=prev+line;else out.push(line);
+  }
+  return out.join("\n");
+ };
+ for(let n=1;n<=pdf.numPages;n++){
+  progress((n-1)/pdf.numPages,`PDFを解析中… ${n}/${pdf.numPages}ページ`);
+  const page=await pdf.getPage(n),tc=await page.getTextContent(),vp=page.getViewport({scale:1}),h=vp.height;
+  const items=tc.items.map(x=>{
+   const tr=x.transform||[];
+   return {str:String(x.str||""),x:Number(tr[4]||0),y:Number(tr[5]||0),w:Number(x.width||0),fs:Math.max(1,Math.hypot(tr[0]||0,tr[1]||0))}
+  }).filter(x=>x.str.trim()&&!isMark(x.str,x.y,h)&&!(x.fs<6.2&&x.str.trim().length<=10));
+  const text=rebuild(items);pages.push(text);pageData.push({page:n,text});
+ }
+ progress(1,"読み込み完了");return {pages,pageData};
 }
 
 function pdfToScenes(i){const p=current().pdfs[i],blocks=p.text.split(/\n{2,}(?=【\d+ページ】)/).filter(Boolean);blocks.forEach((b,n)=>{const m=b.match(/^【(\d+)ページ】\n?([\s\S]*)$/);current().scenes.push({title:`PDF ${m?m[1]:n+1}ページ`,body:m?m[2]:b,info:"",kp:""})});save();show("scenes")}
