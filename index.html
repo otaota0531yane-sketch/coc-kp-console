@@ -214,6 +214,14 @@ input,select,textarea{max-width:100%}
 .pdfTextLayer{position:absolute;inset:0;overflow:hidden;opacity:.01;cursor:text;user-select:text;-webkit-user-select:text}
 .pdfTextLayer span{position:absolute;white-space:pre;user-select:text;-webkit-user-select:text;color:#000}
 @media(max-width:599px){.pdfViewerHead{flex-direction:column;align-items:stretch;padding:8px}.pdfViewerButtons{overflow-x:auto;flex-wrap:nowrap}.pdfViewerButtons .btn{white-space:nowrap}.pdfOriginalPages{padding:10px 5px 40px}.originalPage{width:100%;padding:4px}}
+
+.iaCharaBox{margin:12px 0;padding:12px;border:1px solid #315b7c;border-radius:12px;background:rgba(30,75,105,.10)}
+.iaCharaBox label{display:block;font-weight:700;margin-bottom:6px}
+.variablePanel{border-color:#596b80}
+.variableGroup{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px}
+.variableGroup>b{min-width:42px}
+.varChip{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;background:#23364a;border:1px solid #3e5a73}
+.varChip button{border:0;background:transparent;color:inherit;cursor:pointer;padding:0 2px}
 </style>
 </head>
 <body>
@@ -397,6 +405,14 @@ function addVariable(kind){
  save();render();
 }
 function removeVariable(kind,i){variableNames()[kind].splice(i,1);save();render()}
+
+function variablePanel(){
+ const v=variableNames();
+ return `<div class="card variablePanel"><div class="eyebrow">COCOFOLIA VARIABLES</div><h3>ココフォリア変数</h3><p class="muted small">登録した名前だけを「HO東」「PC東」「KPC」などから {HO東} の形に変換します。</p>
+ <div class="variableGroup"><b>HO</b>${v.ho.map((x,i)=>`<span class="varChip">HO${esc(x)} <button onclick="removeVariable('ho',${i})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('ho')">＋ HO名</button></div>
+ <div class="variableGroup"><b>PC</b>${v.pc.map((x,i)=>`<span class="varChip">PC${esc(x)} <button onclick="removeVariable('pc',${i})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('pc')">＋ PC名</button></div>
+ <div class="variableGroup"><b>KPC</b>${v.kpc.map((x,i)=>`<span class="varChip">${esc(x)} <button onclick="removeVariable('kpc',${i})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('kpc')">＋ KPC名</button></div></div>`;
+}
 function openVariableSettings(){
  const s=current(),v=variableNames();
  let msg="変数化する名前を登録します。\\n\\nHO: "+(v.ho.join(", ")||"なし")+"\\nPC: "+(v.pc.join(", ")||"なし")+"\\nKPC: "+(v.kpc.join(", ")||"なし");
@@ -468,9 +484,9 @@ function scenes(c){
 function openScene(i){
  const x=current().scenes[i];
  document.getElementById("content").innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENE ${i+1}</div><h2>シーン編集</h2></div><div class="row"><button class="btn ghost" onclick="setCurrentScene(${i})">▶ 今ここ</button><button class="btn ghost" onclick="show('scenes')">← 一覧</button></div></div><label>タイトル</label><input value="${esc(x.title)}" oninput="current().scenes[${i}].title=this.value;save()"></div>
- <div class="sceneEditGrid"><div class="card sceneBody"><div class="row between"><h3>本文・描写</h3><span class="sceneTag bodyTag">本文</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea><button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">本文をコピー</button></div>
- <div class="card sceneInfo"><div class="row between"><h3>PLへ公開する情報</h3><span class="sceneTag infoTag">公開</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea><button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">公開情報をコピー</button></div>
- <div class="card sceneKP"><div class="row between"><h3>KPだけが見る情報</h3><span class="sceneTag kpTag">KP</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div>
+ ${variablePanel()}<div class="sceneEditGrid"><div class="card sceneBody"><div class="row between"><h3>本文・描写</h3><span class="sceneTag bodyTag">本文</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea><div class="row"><button class="btn ghost" onclick="variableizeScene(${i},'body')">本文を変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">本文をコピー</button></div></div>
+ <div class="card sceneInfo"><div class="row between"><h3>PLへ公開する情報</h3><span class="sceneTag infoTag">公開</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea><div class="row"><button class="btn ghost" onclick="variableizeScene(${i},'info')">公開情報を変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">公開情報をコピー</button></div></div>
+ <div class="card sceneKP"><div class="row between"><h3>KPだけが見る情報</h3><span class="sceneTag kpTag">KP</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea><div class="row"><button class="btn ghost" onclick="variableizeScene(${i},'kp')">KP情報を変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div></div>
  <div class="card"><div class="eyebrow">PROGRESS</div><div class="row sessionChecks">${[["body","描写済み"],["info","情報提示済み"],["judge","判定済み"],["next","次への条件確認"]].map(([k,l])=>`<label class="check"><input type="checkbox" ${x.checks?.[k]?"checked":""} onchange="toggleSceneCheck(${i},'${k}',this.checked)"><span>${l}</span></label>`).join("")}</div></div>
  <div class="card"><div class="row"><button class="btn" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">本文＋公開情報をコピー</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info+'\\n\\n'+current().scenes[${i}].kp)">全部コピー</button></div></div>`;
 }
@@ -486,16 +502,15 @@ function ho(c){
 function addHO(){current().hos.push({name:`HO${current().hos.length+1}`,secret:"",memo:""});save();render()}
 function sDelete(type,i){if(confirm("削除しますか？")){current()[type].splice(i,1);save();render()}}
 function pc(c){
- const s=current();c.innerHTML=`<div class="card" style="border-color:#28577d"><div class="eyebrow">CHARACTERS</div><div class="row between"><div><h2>キャラクター</h2><p class="muted small">キャラシのページURLを登録して、ここからすぐ開けます。</p></div><span class="badge pc">♙ キャラシ</span></div>
- <div class="notice">いあきゃらのURLを貼り付けて保存できます。キャラシの内容をこのツールが取得することはありません。</div></div>
- <div class="grid">${s.pcs.map((p,i)=>`<div class="card" style="border-color:#234e70"><div class="row between"><h3>${esc(p.name)}</h3><span class="badge pc">キャラクター</span></div>
- <label>キャラクター名</label><input value="${esc(p.name)}" oninput="current().pcs[${i}].name=this.value;save()">
- <label>いあきゃらのURL</label><input value="${esc(p.url)}" placeholder="https://..." oninput="current().pcs[${i}].url=this.value;save()">
- <div class="row">${p.url?`<a class="link" href="${esc(p.url)}" target="_blank" rel="noopener">→ いあきゃらを開く</a>`:"<span class='muted small'>URLを登録すると、ここに開くボタンが表示されます。</span>"}</div>
- <label>KP確認メモ</label><textarea oninput="current().pcs[${i}].memo=this.value;save()">${esc(p.memo)}</textarea>
- <button class="btn danger" onclick="sDelete('pcs',${i})">削除</button></div><div class="iaCharaBox"><label>いあきゃらURL</label><input type="url" value="${esc(p.iaCharaUrl||p.url||"")}" placeholder="https://iachara.com/..." oninput="current().pcs[${i}].iaCharaUrl=this.value;current().pcs[${i}].url=this.value;save()"><div class="row"><button class="btn ghost" onclick="setIaCharaUrl(${i})">URLを登録</button><button class="btn ghost" onclick="openIaCharaUrl(${i})">いあきゃらを開く</button></div></div>`).join("")||`<div class="empty">キャラクターがまだありません。</div>`}</div>`
+ const s=current(); c.innerHTML=`<div class="card characterHeader"><div class="eyebrow">CHARACTERS</div><div class="row between"><div><h2>キャラクター</h2><p class="muted small">キャラシのページURLを登録できます。</p></div><span class="badge pc">♙ キャラクター</span></div></div>
+ <div class="grid">${s.pcs.map((p,i)=>`<div class="card characterCard"><div class="row between"><h3>${esc(p.name||"キャラクター")}</h3><span class="badge pc">キャラクター</span></div>
+ <label>キャラクター名</label><input value="${esc(p.name||"")}" oninput="current().pcs[${i}].name=this.value;save()">
+ <div class="iaCharaBox"><label>いあきゃらURL</label><input type="url" value="${esc(p.iaCharaUrl||p.url||"")}" placeholder="https://iachara.com/..." oninput="current().pcs[${i}].iaCharaUrl=this.value;current().pcs[${i}].url=this.value;save()"><div class="row"><button class="btn" onclick="openIaCharaUrl(${i})">↗ いあきゃらを開く</button></div></div>
+ <label>KP確認メモ</label><textarea oninput="current().pcs[${i}].memo=this.value;save()">${esc(p.memo||"")}</textarea>
+ <button class="btn danger" onclick="sDelete('pcs',${i})">削除</button></div>`).join("")||`<div class="empty">キャラクターがまだありません。</div>`}</div>`;
 }
-function addPC(){current().pcs.push({name:"新しいキャラクター",url:"",memo:""});save();render()}
+function addPC(){current().pcs.push({name:"新しいキャラクター",url:"",iaCharaUrl:"",memo:""});save();render()}
+
 function actor(c,type){
  const s=current(),isNpc=type==="npc",label=isNpc?"NPC・登場人物":"敵・エネミー",icon=isNpc?"♧":"⚔",cls=isNpc?"npc":"enemy";
  const border=isNpc?"#2b6855":"#6c3040",soft=isNpc?"#245443":"#5c2937";
@@ -564,8 +579,8 @@ function pdf(c){
   <p class="muted">PDFを読み込んだあと、プレビューでページごとの文章を確認できます。必要な範囲だけ選択して、本文・公開情報・KP情報へ取り込めます。</p>
   <div class="file">
    <input id="pdfFile" type="file" accept="application/pdf" multiple>
-   <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="pdfOcr" type="checkbox" checked style="width:auto"><span>画像・図・スキャン・枠内の文字もOCRする</span></label>
-   <p class="small muted">OCRをONにすると、画像化された文字も認識します。長いPDFほど時間がかかります。</p>
+   <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input id="pdfOcr" type="checkbox" checked style="width:auto"></label>
+   
    <progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div>
   </div>
  </div>
