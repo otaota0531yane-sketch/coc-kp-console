@@ -245,6 +245,8 @@ input,select,textarea{max-width:100%}
 .pdfDestination{margin-top:12px}
 .pdfDestination select{min-width:220px;max-width:100%;padding:9px}
 .pdfDestination input{min-width:220px;flex:1}
+
+.scenePartColumns{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}.sceneColumn{min-width:0}.sceneScroll{max-height:60vh;overflow-y:auto;padding:2px 7px 12px 2px;overscroll-behavior:contain}.dialogueScroll{max-height:38vh}.scenePart{margin:10px 0}.scenePartText{min-height:150px;width:100%;box-sizing:border-box}.kpSceneText{min-height:180px;width:100%;box-sizing:border-box}.dialoguePart{border-left:3px solid #a56b87}@media(max-width:850px){.scenePartColumns{grid-template-columns:1fr}.sceneScroll{max-height:50vh}.dialogueScroll{max-height:40vh}}
 </style>
 </head>
 <body>
@@ -288,7 +290,7 @@ const KEY="kp_console_v6";
 const NAV=[
  ["home","⌂","ホーム"],["session","▶","今ここ"],["search","⌕","検索"],["scenes","▤","シナリオ"],
  ["kp","✦","KP情報"],["ho","◇","HO・秘匿"],["pc","♙","PC・キャラクター"],
- ["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],["prep","✓","準備"],["help","?","使い方"]
+ ["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],["prep","✓","準備"]
 ];
 let store=load();
 let tab="home";
@@ -454,7 +456,7 @@ function removeVariable(kind,i,sceneIndex=null){
 
 function variablePanel(sceneIndex=null){
  const v=variableNames();
- return `<div class="card variablePanel"><div class="eyebrow">COCOFOLIA VARIABLES</div><h3>ココフォリア変数</h3><p class="muted small">登録した名前だけを「HO東」「PC東」「KPC」などから {HO東} の形に変換します。</p>
+ return `<div class="card variablePanel"><div class="eyebrow">COCOFOLIA VARIABLES</div><h3>ココフォリア変数</h3><p class="muted small">登録した名前だけを「HO1」「PC」「KPC」などから {HO1} の形に変換します。</p>
  <div class="variableGroup"><b>HO</b>${v.ho.map((x,i)=>`<span class="varChip">HO${esc(x)} <button onclick="removeVariable('ho',${i},${sceneIndex===null?'null':sceneIndex})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('ho',${sceneIndex===null?'null':sceneIndex})">＋ HO名</button></div>
  <div class="variableGroup"><b>PC</b>${v.pc.map((x,i)=>`<span class="varChip">PC${esc(x)} <button onclick="removeVariable('pc',${i},${sceneIndex===null?'null':sceneIndex})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('pc',${sceneIndex===null?'null':sceneIndex})">＋ PC名</button></div>
  <div class="variableGroup"><b>KPC</b>${v.kpc.map((x,i)=>`<span class="varChip">${esc(x)} <button onclick="removeVariable('kpc',${i},${sceneIndex===null?'null':sceneIndex})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('kpc',${sceneIndex===null?'null':sceneIndex})">＋ KPC名</button></div></div>`;
@@ -575,33 +577,27 @@ function variableizePart(i,pi){
  if(part.type==="public")sc.info=ensureSceneParts(sc).filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
  save(); openScene(i); toast("変数化しました");
 }
+
+function addDialoguePart(i){const sc=current().scenes?.[i];if(!sc)return;const parts=ensureSceneParts(sc);parts.push({type:"dialogue",title:`NPCセリフ ${parts.filter(x=>x.type==="dialogue").length+1}`,text:""});save();openScene(i);}
+function findFirstPartIndex(i,type,pi){const parts=ensureSceneParts(current().scenes[i]);const a=parts.map((x,n)=>({x,n})).filter(o=>o.x.type===type&&o.n<pi);return a.length?a[a.length-1].n:-1;}
+function mergeSceneParts(i,fromPi,toPi){const sc=current().scenes?.[i];if(!sc||toPi<0||fromPi===toPi)return;const parts=ensureSceneParts(sc),from=parts[fromPi],to=parts[toPi];if(!from||!to||from.type!==to.type)return;to.text=(to.text?to.text+"\n\n":"")+(from.text||"");parts.splice(fromPi,1);sc.body=parts.filter(x=>x.type==="body").map(x=>x.text).join("\n\n");sc.info=parts.filter(x=>x.type==="public").map(x=>x.text).join("\n\n");save();openScene(i);}
+function getPDFTargetScene(){const v=Number(localStorage.getItem("kp_pdf_target_scene"));return Number.isInteger(v)&&v>=0&&v<current().scenes.length?v:(current().scenes.length?0:-1);}
+function setPDFTargetScene(v){localStorage.setItem("kp_pdf_target_scene",String(v));}
 function openScene(i){
- const sc=current().scenes?.[i]; if(!sc)return;
- const parts=ensureSceneParts(sc);
- const c=document.getElementById("content");
- c.innerHTML=`<div class="sceneEditor">
- <div class="card sceneEditorHead"><div class="eyebrow">SCENE EDITOR</div><div class="row between"><div><h2>${esc(sc.title||"シーン")}</h2><p class="muted small">1シーンの中で描写・公開情報を小分けに登録できます。</p></div><div class="row"><button class="btn ghost" onclick="renameScene(${i})">✎ シーン名変更</button><button class="btn ghost" onclick="render()">← シーン一覧へ</button></div></div></div>
+ const sc=current().scenes?.[i];if(!sc)return;const parts=ensureSceneParts(sc);const c=document.getElementById("content");
+ c.innerHTML=`<div class="sceneEditor"><div class="card sceneEditorHead"><div class="eyebrow">SCENE EDITOR</div><div class="row between"><div><h2>${esc(sc.title||"シーン")}</h2><p class="muted small">各欄の中だけスクロールできます。</p></div><div class="row"><button class="btn ghost" onclick="renameScene(${i})">✎ シーン名変更</button><button class="btn ghost" onclick="render()">← シーン一覧へ</button></div></div></div>
  ${typeof variablePanel==="function"?variablePanel():""}
  <div class="scenePartColumns">
-  <section><div class="row between"><h3>本文・描写</h3><button class="btn ghost" onclick="addScenePart(${i},'body')">＋ 描写を追加</button></div>
-  ${parts.map((part,pi)=>part.type==="body"?`<div class="card scenePart bodyPart">
-   <div class="row between"><input class="partTitle" value="${esc(part.title||"描写")}" oninput="updateScenePart(${i},${pi},'title',this.value)"><label class="check"><input type="checkbox" ${part.done?"checked":""} onchange="updateScenePart(${i},${pi},'done',this.checked)"> 描写済</label></div>
-   <textarea class="scenePartText" placeholder="本文・描写を入力..." oninput="updateScenePart(${i},${pi},'text',this.value)">${esc(part.text||"")}</textarea>
-   <div class="row"><button class="btn ghost" onclick="variableizePart(${i},${pi})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${pi}].text)">コピー</button><button class="btn danger" onclick="removeScenePart(${i},${pi})">削除</button></div>
-  </div>`:"").join("")||`<div class="empty">描写がありません。</div>`}
-  </section>
-  <section><div class="row between"><h3>PLへ公開する情報</h3><button class="btn ghost" onclick="addScenePart(${i},'public')">＋ 公開情報を追加</button></div>
-  ${parts.map((part,pi)=>part.type==="public"?`<div class="card scenePart publicPart">
-   <div class="row between"><input class="partTitle" value="${esc(part.title||"公開情報")}" oninput="updateScenePart(${i},${pi},'title',this.value)"><div class="checkGroup"><label class="check"><input type="checkbox" ${part.revealed?"checked":""} onchange="updateScenePart(${i},${pi},'revealed',this.checked)"> 情報開示済</label><label class="check"><input type="checkbox" ${part.judged?"checked":""} onchange="updateScenePart(${i},${pi},'judged',this.checked)"> 判定済</label></div></div>
-   <textarea class="scenePartText" placeholder="PLへ公開する情報を入力..." oninput="updateScenePart(${i},${pi},'text',this.value)">${esc(part.text||"")}</textarea>
-   <div class="row"><button class="btn ghost" onclick="variableizePart(${i},${pi})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${pi}].text)">コピー</button><button class="btn danger" onclick="removeScenePart(${i},${pi})">削除</button></div>
-  </div>`:"").join("")||`<div class="empty">公開情報がありません。</div>`}
-  </section>
- </div>
- <section><div class="row between"><h3>KPだけが見る情報</h3></div>
- <div class="card"><textarea class="kpSceneText" placeholder="KP用メモ・裏情報・進行メモなど..." oninput="current().scenes[${i}].kp=this.value;save()">${esc(sc.kp||"")}</textarea>
- <div class="row"><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div></section>
- </div>`;
+ <section class="sceneColumn"><div class="row between"><h3>本文・描写</h3><button class="btn ghost" onclick="addScenePart(${i},'body')">＋ 描写を追加</button></div><div class="sceneScroll">
+ ${parts.map((p,n)=>p.type==="body"?`<div class="card scenePart"><div class="row between"><input class="partTitle" value="${esc(p.title||"描写")}" oninput="updateScenePart(${i},${n},'title',this.value)"><label class="check"><input type="checkbox" ${p.done?"checked":""} onchange="updateScenePart(${i},${n},'done',this.checked)"> 描写済</label></div><textarea class="scenePartText" oninput="updateScenePart(${i},${n},'text',this.value)">${esc(p.text||"")}</textarea><div class="row"><button class="btn ghost" onclick="variableizePart(${i},${n})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${n}].text)">コピー</button><button class="btn ghost" onclick="mergeSceneParts(${i},${n},findFirstPartIndex(${i},'body',${n}))">前の描写へ統合</button><button class="btn danger" onclick="removeScenePart(${i},${n})">削除</button></div></div>`:"").join("")||`<div class="empty">描写がありません。</div>`}
+ </div></section>
+ <section class="sceneColumn"><div class="row between"><h3>PLへ公開する情報</h3><button class="btn ghost" onclick="addScenePart(${i},'public')">＋ 公開情報を追加</button></div><div class="sceneScroll">
+ ${parts.map((p,n)=>p.type==="public"?`<div class="card scenePart"><div class="row between"><input class="partTitle" value="${esc(p.title||"公開情報")}" oninput="updateScenePart(${i},${n},'title',this.value)"><div class="checkGroup"><label class="check"><input type="checkbox" ${p.revealed?"checked":""} onchange="updateScenePart(${i},${n},'revealed',this.checked)"> 情報開示済</label><label class="check"><input type="checkbox" ${p.judged?"checked":""} onchange="updateScenePart(${i},${n},'judged',this.checked)"> 判定済</label></div></div><textarea class="scenePartText" oninput="updateScenePart(${i},${n},'text',this.value)">${esc(p.text||"")}</textarea><div class="row"><button class="btn ghost" onclick="variableizePart(${i},${n})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${n}].text)">コピー</button><button class="btn ghost" onclick="mergeSceneParts(${i},${n},findFirstPartIndex(${i},'public',${n}))">前の情報へ統合</button><button class="btn danger" onclick="removeScenePart(${i},${n})">削除</button></div></div>`:"").join("")||`<div class="empty">公開情報がありません。</div>`}
+ </div></section></div>
+ <section class="sceneColumn"><div class="row between"><h3>NPCのセリフ</h3><button class="btn ghost" onclick="addDialoguePart(${i})">＋ セリフを追加</button></div><div class="sceneScroll dialogueScroll">
+ ${parts.map((p,n)=>p.type==="dialogue"?`<div class="card scenePart dialoguePart"><input class="partTitle" value="${esc(p.title||"NPCセリフ")}" oninput="updateScenePart(${i},${n},'title',this.value)"><textarea class="scenePartText" placeholder="NPCのセリフを入力..." oninput="updateScenePart(${i},${n},'text',this.value)">${esc(p.text||"")}</textarea><div class="row"><button class="btn ghost" onclick="variableizePart(${i},${n})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${n}].text)">コピー</button><button class="btn ghost" onclick="mergeSceneParts(${i},${n},findFirstPartIndex(${i},'dialogue',${n}))">前のセリフへ統合</button><button class="btn danger" onclick="removeScenePart(${i},${n})">削除</button></div></div>`:"").join("")||`<div class="empty">NPCのセリフがありません。</div>`}
+ </div></section>
+ <section><h3>KPだけが見る情報</h3><div class="card"><textarea class="kpSceneText" oninput="current().scenes[${i}].kp=this.value;save()">${esc(sc.kp||"")}</textarea><div class="row"><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div></section></div>`;
 }
 
 function kp(c){
@@ -723,7 +719,7 @@ function previewPDF(i){
  const p=current().pdfs[i],pages=getPDFPages(p);
  const c=document.getElementById("content");
  c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を全ページ表示':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
- <div class="fileTypeHint">PDFだけでなく .txt / .text のテキストファイルも読み込めます。</div><div class="pdfDestination card"><div class="row between"><div><b>抽出した文章の追加先</b><div class="small muted">ここで既存シーンを選ぶか、新しいシーンを追加できます。</div></div><select id="pdfSceneSelect">${pdfSceneOptions(current().scenes.length?0:"")}</select></div><div class="row"><input id="pdfNewSceneName" placeholder="新しいシーン名"><button class="btn" onclick="addSceneFromPDF()">＋ シーンを追加して保存</button></div></div>
+ <div class="fileTypeHint">PDFだけでなく .txt / .text のテキストファイルも読み込めます。</div><div class="pdfDestination card"><div class="row between"><div><b>抽出した文章の追加先</b><div class="small muted">ここで既存シーンを選ぶか、新しいシーンを追加できます。</div></div><select id="pdfSceneSelect" onchange="setPDFTargetScene(this.value)">${pdfSceneOptions(getPDFTargetScene())}</select></div><div class="row"><input id="pdfNewSceneName" placeholder="新しいシーン名"><button class="btn" onclick="addSceneFromPDF()">＋ シーンを追加して保存</button><button class="btn ghost" onclick="setPDFTargetScene(document.getElementById('pdfSceneSelect').value)">このシーンを固定</button></div></div>
  <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'kp')">選択範囲→KP</button></div></div>
  <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
 }
@@ -898,24 +894,6 @@ function importScenario(file){
 }
 function repairScenario(s){s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};s.actors.npc??=[];s.actors.enemy??=[];s.pdfs??=[];s.prep??={};s.kpInfo??="";s.bookmarks??=[];s.session??={currentScene:0,checks:{}};s.scenes.forEach(x=>{x.body??="";x.info??="";x.kp??="";x.checks??={body:false,info:false,judge:false,next:false}})}
 
-function help(c){
- const items=[
-  ["ホーム","シナリオ全体の概要を確認できます。登録したシナリオを切り替えたり、現在の進行状況を確認する入口です。"],
-  ["今ここ","現在進行しているシーンをすぐ開けます。本番中に使う司令塔として利用できます。"],
-  ["検索","登録したシーン、HO、PC、NPC、敵、PDFの文章をまとめて検索できます。"],
-  ["シナリオ","シーンを登録・並べ替え・削除できます。シーン名は各シーンの編集画面から個別に変更できます。"],
-  ["KP情報","シナリオ全体に関わるKP向けメモをまとめて管理します。"],
-  ["HO・秘匿","HOごとの秘匿情報やメモを管理します。"],
-  ["PC・キャラクター","PCを登録します。キャラクターごとにいあきゃらのURLを保存して、いつでも開けます。"],
-  ["NPC・登場人物","NPCの能力値・技能・設定・KPメモを登録し、駒作成用にコピーできます。"],
-  ["敵・エネミー","敵もNPCと同じように能力値・技能・設定・KPメモを管理できます。"],
-  ["PDF","シナリオPDFを読み込み、ページや段落単位で文章を確認・コピーできます。抽出した文章は、ここから既存シーンへ追加したり、新しいシーンを作って追加できます。"],
-  ["準備","本番前にココフォリアへ貼り付ける情報をまとめて確認・コピーします。"],
-  ["使い方","このページです。各タブの役割を簡単に確認できます。"]
- ];
- c.innerHTML=`<div class="card"><div class="eyebrow">HOW TO USE</div><h2>このツールの使い方</h2><p class="muted">各項目をタップすると説明が開きます。</p></div>
- <div class="helpList">${items.map((x,i)=>`<details class="helpItem" ${i===0?"open":""}><summary><span class="helpNo">${String(i+1).padStart(2,"0")}</span><b>${esc(x[0])}</b><span class="helpChevron">＋</span></summary><div class="helpBody">${esc(x[1])}</div></details>`).join("")}</div>`;
-}
 function prep(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">PREPARATION</div><h2>ココフォリア用準備</h2><p class="muted small">コピーして、登録したい場所へ貼り付けるだけの準備画面。</p></div>
  <div class="grid"><div class="card"><h3>シーン</h3>${s.scenes.map((x,i)=>`<div class="row between"><span>${esc(x.title)}</span><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">コピー</button></div>`).join("")||"<p class='muted'>なし</p>"}</div>
