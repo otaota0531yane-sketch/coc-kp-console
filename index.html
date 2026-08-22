@@ -247,6 +247,19 @@ input,select,textarea{max-width:100%}
 .pdfDestination input{min-width:220px;flex:1}
 
 .scenePartColumns{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}.sceneColumn{min-width:0}.sceneScroll{max-height:60vh;overflow-y:auto;padding:2px 7px 12px 2px;overscroll-behavior:contain}.dialogueScroll{max-height:38vh}.scenePart{margin:10px 0}.scenePartText{min-height:150px;width:100%;box-sizing:border-box}.kpSceneText{min-height:180px;width:100%;box-sizing:border-box}.dialoguePart{border-left:3px solid #a56b87}@media(max-width:850px){.scenePartColumns{grid-template-columns:1fr}.sceneScroll{max-height:50vh}.dialogueScroll{max-height:40vh}}
+
+/* PDF extracted text: keep the extracted-text frame fixed in the viewport while its contents scroll. */
+.pdfExtractedPanel,.extractedTextPanel,.pdfTextPanel{position:sticky;top:12px;align-self:flex-start;max-height:calc(100vh - 24px);overflow:hidden}
+.pdfExtractedPanel .extractedText,.extractedTextPanel .extractedText,.pdfTextPanel .extractedText,
+.pdfExtractedPanel textarea,.extractedTextPanel textarea,.pdfTextPanel textarea{max-height:calc(100vh - 150px);overflow-y:auto}
+@media(max-width:850px){.pdfExtractedPanel,.extractedTextPanel,.pdfTextPanel{position:sticky;top:6px;max-height:calc(100vh - 12px)}.pdfExtractedPanel .extractedText,.extractedTextPanel .extractedText,.pdfTextPanel .extractedText,.pdfExtractedPanel textarea,.extractedTextPanel textarea,.pdfTextPanel textarea{max-height:45vh}}
+/* Make the scene variable panel compact. */
+.variablePanel{padding:10px 12px;margin-bottom:10px}
+.variablePanel .eyebrow{font-size:.72rem}
+.variablePanel h3{margin:2px 0 3px;font-size:1rem}
+.variablePanel p{margin:0 0 5px}
+.variablePanel .variableGroup{margin-top:5px;gap:5px}
+.variablePanel .varChip{padding:3px 7px;font-size:.85rem}
 </style>
 </head>
 <body>
@@ -456,7 +469,7 @@ function removeVariable(kind,i,sceneIndex=null){
 
 function variablePanel(sceneIndex=null){
  const v=variableNames();
- return `<div class="card variablePanel"><div class="eyebrow">COCOFOLIA VARIABLES</div><h3>ココフォリア変数</h3><p class="muted small">登録した名前だけを「HO1」「PC」「KPC」などから {HO1} の形に変換します。</p>
+ return `<div class="card variablePanel"><div class="eyebrow">COCOFOLIA VARIABLES</div><h3>ココフォリア変数</h3><p class="muted small">HO1・PC・KPCなどをココフォリア変数に変換します。</p>
  <div class="variableGroup"><b>HO</b>${v.ho.map((x,i)=>`<span class="varChip">HO${esc(x)} <button onclick="removeVariable('ho',${i},${sceneIndex===null?'null':sceneIndex})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('ho',${sceneIndex===null?'null':sceneIndex})">＋ HO名</button></div>
  <div class="variableGroup"><b>PC</b>${v.pc.map((x,i)=>`<span class="varChip">PC${esc(x)} <button onclick="removeVariable('pc',${i},${sceneIndex===null?'null':sceneIndex})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('pc',${sceneIndex===null?'null':sceneIndex})">＋ PC名</button></div>
  <div class="variableGroup"><b>KPC</b>${v.kpc.map((x,i)=>`<span class="varChip">${esc(x)} <button onclick="removeVariable('kpc',${i},${sceneIndex===null?'null':sceneIndex})">×</button></span>`).join("")}<button class="btn ghost" onclick="addVariable('kpc',${sceneIndex===null?'null':sceneIndex})">＋ KPC名</button></div></div>`;
@@ -721,7 +734,7 @@ function previewPDF(i){
  c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を全ページ表示':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
  <div class="fileTypeHint">PDFだけでなく .txt / .text のテキストファイルも読み込めます。</div><div class="pdfDestination card"><div class="row between"><div><b>抽出した文章の追加先</b><div class="small muted">ここで既存シーンを選ぶか、新しいシーンを追加できます。</div></div><select id="pdfSceneSelect" onchange="setPDFTargetScene(this.value)">${pdfSceneOptions(getPDFTargetScene())}</select></div><div class="row"><input id="pdfNewSceneName" placeholder="新しいシーン名"><button class="btn" onclick="addSceneFromPDF()">＋ シーンを追加して保存</button><button class="btn ghost" onclick="setPDFTargetScene(document.getElementById('pdfSceneSelect').value)">このシーンを固定</button></div></div>
  <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'kp')">選択範囲→KP</button></div></div>
- <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
+ <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'kp')">→KP</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'dialogue')">→NPCセリフ</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
 }
 function appendTextToScene(pdfIndex,pageIndex,paraIndex,field){const p=current().pdfs[pdfIndex],pages=getPDFPages(p),t=splitParagraphs(pages[pageIndex]?.text||"")[paraIndex]||"";if(!t)return;const s=current(),label={body:'本文',info:'公開情報',kp:'KP情報'}[field],i=prompt(`どのシーンの${label}へ追加しますか？\n番号を入力（1〜${s.scenes.length}）`,String(s.scenes.length||1)),n=Number(i)-1;if(!Number.isInteger(n)||n<0||n>=s.scenes.length)return;s.scenes[n][field]=(s.scenes[n][field]?s.scenes[n][field]+'\n\n':'')+t;save();toast(`シーン${n+1}の${label}へ追加しました`)}
 
@@ -856,7 +869,7 @@ function addPDFTextToDestination(pdfIndex,pageIndex,paraIndex,field){
    const parts=ensureSceneParts(sc), arr=parts.filter(x=>x.type===type);
    const part=arr[arr.length-1];
    if(part){part.text=(part.text?part.text+"\n\n":"")+t}
-   else parts.push(type==="body"?{type:"body",title:"描写 1",text:t,done:false}:{type:"public",title:"公開情報 1",text:t,revealed:false,judged:false});
+   else parts.push(type==="body"?{type:"body",title:"描写 1",text:t,done:false}:type==="public"?{type:"public",title:"公開情報 1",text:t,revealed:false,judged:false}:{type:"dialogue",title:"NPCセリフ 1",text:t});
    sc.body=parts.filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
    sc.info=parts.filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
  }else sc.kp=(sc.kp?sc.kp+"\n\n":"")+t;
@@ -868,8 +881,8 @@ function addSelectedPDFToDestination(pdfIndex,field){
  const n=ensurePDFDestination();
  if(!Number.isInteger(n)||n<0||n>=current().scenes.length)return toast("追加先のシーンを選択してください");
  const sc=current().scenes[n]; ensureSceneParts(sc);
- if(field==="body"||field==="info"){
-   const type=field==="body"?"body":"public",parts=ensureSceneParts(sc),arr=parts.filter(x=>x.type===type),part=arr[arr.length-1];
+ if(field==="body"||field==="info"||field==="dialogue"){
+   const type=field==="body"?"body":field==="info"?"public":"dialogue",parts=ensureSceneParts(sc),arr=parts.filter(x=>x.type===type),part=arr[arr.length-1];
    if(part)part.text=(part.text?part.text+"\n\n":"")+t;
    else parts.push(type==="body"?{type:"body",title:"描写 1",text:t,done:false}:{type:"public",title:"公開情報 1",text:t,revealed:false,judged:false});
    sc.body=parts.filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
