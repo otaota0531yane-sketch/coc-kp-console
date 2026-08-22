@@ -224,6 +224,15 @@ input,select,textarea{max-width:100%}
 .varChip button{border:0;background:transparent;color:inherit;cursor:pointer;padding:0 2px}
 .iaCharaBox{margin:12px 0;padding:12px;border:1px solid #315b7c;border-radius:12px;background:rgba(30,75,105,.10)}.iaCharaBox label{display:block;font-weight:700;margin-bottom:6px}.iaCharaBox{margin:12px 0;padding:12px;border:1px solid #315b7c;border-radius:12px;background:rgba(30,75,105,.10)}
 .iaCharaBox label{display:block;font-weight:700;margin-bottom:6px}
+
+.scenePartColumns{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.scenePart{margin:10px 0}
+.scenePartText,.kpSceneText{min-height:150px;width:100%;box-sizing:border-box}
+.kpSceneText{min-height:180px}
+.partTitle{font-size:1rem;font-weight:700;min-width:120px}
+.checkGroup{display:flex;gap:10px;flex-wrap:wrap}
+.check{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+@media(max-width:850px){.scenePartColumns{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -482,21 +491,81 @@ function renderSearchResults(q){
 }
 function scenes(c){
  const s=current();
- c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENES</div><h2>シーン</h2><p class="muted small">本文・公開情報・KP情報を分け、進行状況も確認できます。</p></div><button class="btn" onclick="addScene()">＋ 新しいシーン</button></div></div>
+ c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENES</div><h2>シーン</h2></div><button class="btn" onclick="addScene()">＋ 新しいシーン</button></div></div>
  <div class="sceneList">${s.scenes.map((x,i)=>{const checks=Object.values(x.checks||{}).filter(Boolean).length;return `<div class="sceneCard ${i===s.session.currentScene?'currentScene':''}">
  <div class="row between"><div class="row"><span class="sceneNo">${String(i+1).padStart(2,"0")}</span><div><h3>${esc(x.title)}</h3><div class="meta">進行 ${checks}/4　${x.body?`本文 ${x.body.length.toLocaleString()}字`:"本文なし"}　${x.info?"公開情報 ":""}${x.kp?"KP情報":""}</div></div></div>
  <div class="row"><button class="btn ghost" onclick="setCurrentScene(${i})">▶ 今ここ</button><button class="btn" onclick="openScene(${i})">開く</button><button class="btn danger" onclick="delScene(${i})">削除</button></div></div>
  <div class="scenePreview">${x.body?`<div><span class="sceneTag bodyTag">本文</span><span>${esc(x.body.slice(0,180))}${x.body.length>180?"…":""}</span></div>`:""}${x.info?`<div><span class="sceneTag infoTag">公開</span><span>${esc(x.info.slice(0,120))}${x.info.length>120?"…":""}</span></div>`:""}${x.kp?`<div><span class="sceneTag kpTag">KP</span><span>${esc(x.kp.slice(0,120))}${x.kp.length>120?"…":""}</span></div>`:""}</div></div>`}).join("")||`<div class="empty">シーンがまだありません。</div>`}</div>`;
 }function addScene(){const s=current();s.scenes.push({title:`シーン ${s.scenes.length+1}`,body:"",info:"",kp:"",tags:[],checks:{body:false,info:false,judge:false,next:false}});save();show("scenes");}
-function openScene(i){
- const x=current().scenes[i];
- document.getElementById("content").innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">SCENE ${i+1}</div><h2>シーン編集</h2></div><div class="row"><button class="btn ghost" onclick="setCurrentScene(${i})">▶ 今ここ</button><button class="btn ghost" onclick="show('scenes')">← 一覧</button></div></div><label>タイトル</label><input value="${esc(x.title)}" oninput="current().scenes[${i}].title=this.value;save()"></div>
- ${variablePanel(i)}<div class="sceneEditGrid"><div class="card sceneBody"><div class="row between"><h3>本文・描写</h3><span class="sceneTag bodyTag">本文</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].body=this.value;save()">${esc(x.body)}</textarea><div class="row"><button class="btn ghost" onclick="variableizeScene(${i},'body')">本文を変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body)">本文をコピー</button></div></div>
- <div class="card sceneInfo"><div class="row between"><h3>PLへ公開する情報</h3><span class="sceneTag infoTag">公開</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].info=this.value;save()">${esc(x.info)}</textarea><div class="row"><button class="btn ghost" onclick="variableizeScene(${i},'info')">公開情報を変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].info)">公開情報をコピー</button></div></div>
- <div class="card sceneKP"><div class="row between"><h3>KPだけが見る情報</h3><span class="sceneTag kpTag">KP</span></div><textarea class="sceneArea" oninput="current().scenes[${i}].kp=this.value;save()">${esc(x.kp)}</textarea><div class="row"><button class="btn ghost" onclick="variableizeScene(${i},'kp')">KP情報を変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div></div>
- <div class="card"><div class="eyebrow">PROGRESS</div><div class="row sessionChecks">${[["body","描写済み"],["info","情報提示済み"],["judge","判定済み"],["next","次への条件確認"]].map(([k,l])=>`<label class="check"><input type="checkbox" ${x.checks?.[k]?"checked":""} onchange="toggleSceneCheck(${i},'${k}',this.checked)"><span>${l}</span></label>`).join("")}</div></div>
- <div class="card"><div class="row"><button class="btn" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">本文＋公開情報をコピー</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info+'\\n\\n'+current().scenes[${i}].kp)">全部コピー</button></div></div>`;
+
+function ensureSceneParts(sc){
+ sc.parts??=[];
+ if(!Array.isArray(sc.parts)) sc.parts=[];
+ if(!sc.parts.length){
+  sc.parts=[{type:"body",title:"描写 1",text:sc.body||"",done:false},
+            {type:"public",title:"公開情報 1",text:sc.info||"",revealed:false,judged:false}];
+ }
+ return sc.parts;
 }
+function addScenePart(i,type){
+ const sc=current().scenes?.[i]; if(!sc)return;
+ const parts=ensureSceneParts(sc);
+ parts.push(type==="body"
+  ? {type:"body",title:`描写 ${parts.filter(x=>x.type==="body").length+1}`,text:"",done:false}
+  : {type:"public",title:`公開情報 ${parts.filter(x=>x.type==="public").length+1}`,text:"",revealed:false,judged:false});
+ save(); openScene(i);
+}
+function removeScenePart(i,pi){
+ const sc=current().scenes?.[i]; if(!sc)return;
+ const parts=ensureSceneParts(sc); parts.splice(pi,1);
+ sc.body=parts.filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
+ sc.info=parts.filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
+ save(); openScene(i);
+}
+function updateScenePart(i,pi,key,val){
+ const sc=current().scenes?.[i]; if(!sc)return;
+ const part=ensureSceneParts(sc)[pi]; if(!part)return;
+ part[key]=val;
+ if(part.type==="body") sc.body=ensureSceneParts(sc).filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
+ if(part.type==="public") sc.info=ensureSceneParts(sc).filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
+ save();
+}
+function variableizePart(i,pi){
+ const sc=current().scenes?.[i],part=sc&&ensureSceneParts(sc)[pi]; if(!part)return;
+ part.text=variableizeText(part.text||"");
+ if(part.type==="body")sc.body=ensureSceneParts(sc).filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
+ if(part.type==="public")sc.info=ensureSceneParts(sc).filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
+ save(); openScene(i); toast("変数化しました");
+}
+function openScene(i){
+ const sc=current().scenes?.[i]; if(!sc)return;
+ const parts=ensureSceneParts(sc);
+ const c=document.getElementById("content");
+ c.innerHTML=`<div class="sceneEditor">
+ <div class="card sceneEditorHead"><div class="eyebrow">SCENE EDITOR</div><div class="row between"><div><h2>${esc(sc.title||"シーン")}</h2><p class="muted small">1シーンの中で描写・公開情報を小分けに登録できます。</p></div><button class="btn ghost" onclick="render()">← シーン一覧へ</button></div></div>
+ ${typeof variablePanel==="function"?variablePanel():""}
+ <div class="scenePartColumns">
+  <section><div class="row between"><h3>本文・描写</h3><button class="btn ghost" onclick="addScenePart(${i},'body')">＋ 描写を追加</button></div>
+  ${parts.map((part,pi)=>part.type==="body"?`<div class="card scenePart bodyPart">
+   <div class="row between"><input class="partTitle" value="${esc(part.title||"描写")}" oninput="updateScenePart(${i},${pi},'title',this.value)"><label class="check"><input type="checkbox" ${part.done?"checked":""} onchange="updateScenePart(${i},${pi},'done',this.checked)"> 描写済</label></div>
+   <textarea class="scenePartText" placeholder="本文・描写を入力..." oninput="updateScenePart(${i},${pi},'text',this.value)">${esc(part.text||"")}</textarea>
+   <div class="row"><button class="btn ghost" onclick="variableizePart(${i},${pi})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${pi}].text)">コピー</button><button class="btn danger" onclick="removeScenePart(${i},${pi})">削除</button></div>
+  </div>`:"").join("")||`<div class="empty">描写がありません。</div>`}
+  </section>
+  <section><div class="row between"><h3>PLへ公開する情報</h3><button class="btn ghost" onclick="addScenePart(${i},'public')">＋ 公開情報を追加</button></div>
+  ${parts.map((part,pi)=>part.type==="public"?`<div class="card scenePart publicPart">
+   <div class="row between"><input class="partTitle" value="${esc(part.title||"公開情報")}" oninput="updateScenePart(${i},${pi},'title',this.value)"><div class="checkGroup"><label class="check"><input type="checkbox" ${part.revealed?"checked":""} onchange="updateScenePart(${i},${pi},'revealed',this.checked)"> 情報開示済</label><label class="check"><input type="checkbox" ${part.judged?"checked":""} onchange="updateScenePart(${i},${pi},'judged',this.checked)"> 判定済</label></div></div>
+   <textarea class="scenePartText" placeholder="PLへ公開する情報を入力..." oninput="updateScenePart(${i},${pi},'text',this.value)">${esc(part.text||"")}</textarea>
+   <div class="row"><button class="btn ghost" onclick="variableizePart(${i},${pi})">変数化</button><button class="btn ghost" onclick="copyText(current().scenes[${i}].parts[${pi}].text)">コピー</button><button class="btn danger" onclick="removeScenePart(${i},${pi})">削除</button></div>
+  </div>`:"").join("")||`<div class="empty">公開情報がありません。</div>`}
+  </section>
+ </div>
+ <section><div class="row between"><h3>KPだけが見る情報</h3></div>
+ <div class="card"><textarea class="kpSceneText" placeholder="KP用メモ・裏情報・進行メモなど..." oninput="current().scenes[${i}].kp=this.value;save()">${esc(sc.kp||"")}</textarea>
+ <div class="row"><button class="btn ghost" onclick="copyText(current().scenes[${i}].kp)">KP情報をコピー</button></div></div></section>
+ </div>`;
+}
+
 function kp(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">KEEPER NOTES</div><div class="row between"><h2>KP情報</h2><button class="btn" onclick="copyText(current().kpInfo)">KP情報をコピー</button></div>
  <p class="muted small">シナリオ全体を回すときに重要な情報を、本文とは別にまとめます。</p><textarea style="min-height:320px" oninput="current().kpInfo=this.value;save()">${esc(s.kpInfo)}</textarea></div>`
