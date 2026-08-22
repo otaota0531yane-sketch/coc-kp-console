@@ -233,6 +233,18 @@ input,select,textarea{max-width:100%}
 .checkGroup{display:flex;gap:10px;flex-wrap:wrap}
 .check{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 @media(max-width:850px){.scenePartColumns{grid-template-columns:1fr}}
+
+.helpList{display:grid;gap:9px}
+.helpItem{border:1px solid var(--line);border-radius:12px;background:rgba(11,24,39,.7);overflow:hidden}
+.helpItem summary{list-style:none;cursor:pointer;padding:13px 14px;display:flex;align-items:center;gap:10px}
+.helpItem summary::-webkit-details-marker{display:none}
+.helpNo{font-size:11px;color:#7eb8ed;min-width:28px}
+.helpChevron{margin-left:auto;color:var(--muted)}
+.helpItem[open] .helpChevron{transform:rotate(45deg)}
+.helpBody{padding:0 14px 15px 52px;color:var(--muted);line-height:1.75}
+.pdfDestination{margin-top:12px}
+.pdfDestination select{min-width:220px;max-width:100%;padding:9px}
+.pdfDestination input{min-width:220px;flex:1}
 </style>
 </head>
 <body>
@@ -258,7 +270,7 @@ const KEY="kp_console_v6";
 const NAV=[
  ["home","⌂","ホーム"],["session","▶","今ここ"],["search","⌕","検索"],["scenes","▤","シナリオ"],
  ["kp","✦","KP情報"],["ho","◇","HO・秘匿"],["pc","♙","PC・キャラクター"],
- ["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],["prep","✓","準備"]
+ ["npc","♧","NPC・登場人物"],["enemy","⚔","敵・エネミー"],["pdf","▣","PDF"],["prep","✓","準備"],["help","?","使い方"]
 ];
 let store=load();
 let tab="home";
@@ -498,6 +510,14 @@ function scenes(c){
  <div class="scenePreview">${x.body?`<div><span class="sceneTag bodyTag">本文</span><span>${esc(x.body.slice(0,180))}${x.body.length>180?"…":""}</span></div>`:""}${x.info?`<div><span class="sceneTag infoTag">公開</span><span>${esc(x.info.slice(0,120))}${x.info.length>120?"…":""}</span></div>`:""}${x.kp?`<div><span class="sceneTag kpTag">KP</span><span>${esc(x.kp.slice(0,120))}${x.kp.length>120?"…":""}</span></div>`:""}</div></div>`}).join("")||`<div class="empty">シーンがまだありません。</div>`}</div>`;
 }function addScene(){const s=current();s.scenes.push({title:`シーン ${s.scenes.length+1}`,body:"",info:"",kp:"",tags:[],checks:{body:false,info:false,judge:false,next:false}});save();show("scenes");}
 
+
+function renameScene(i){
+ const sc=current().scenes?.[i]; if(!sc)return;
+ const name=prompt("シーン名を変更",sc.title||"シーン");
+ if(name===null)return;
+ const v=name.trim(); if(!v)return;
+ sc.title=v; save(); openScene(i);
+}
 function ensureSceneParts(sc){
  sc.parts??=[];
  if(!Array.isArray(sc.parts)) sc.parts=[];
@@ -542,7 +562,7 @@ function openScene(i){
  const parts=ensureSceneParts(sc);
  const c=document.getElementById("content");
  c.innerHTML=`<div class="sceneEditor">
- <div class="card sceneEditorHead"><div class="eyebrow">SCENE EDITOR</div><div class="row between"><div><h2>${esc(sc.title||"シーン")}</h2><p class="muted small">1シーンの中で描写・公開情報を小分けに登録できます。</p></div><button class="btn ghost" onclick="render()">← シーン一覧へ</button></div></div>
+ <div class="card sceneEditorHead"><div class="eyebrow">SCENE EDITOR</div><div class="row between"><div><h2>${esc(sc.title||"シーン")}</h2><p class="muted small">1シーンの中で描写・公開情報を小分けに登録できます。</p></div><div class="row"><button class="btn ghost" onclick="renameScene(${i})">✎ シーン名変更</button><button class="btn ghost" onclick="render()">← シーン一覧へ</button></div></div></div>
  ${typeof variablePanel==="function"?variablePanel():""}
  <div class="scenePartColumns">
   <section><div class="row between"><h3>本文・描写</h3><button class="btn ghost" onclick="addScenePart(${i},'body')">＋ 描写を追加</button></div>
@@ -685,8 +705,9 @@ function previewPDF(i){
  const p=current().pdfs[i],pages=getPDFPages(p);
  const c=document.getElementById("content");
  c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を全ページ表示':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
- <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="appendSelectedPDF(${i},'kp')">選択範囲→KP</button></div></div>
- <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="appendTextToScene(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
+ <div class="pdfDestination card"><div class="row between"><div><b>抽出した文章の追加先</b><div class="small muted">ここで既存シーンを選ぶか、新しいシーンを追加できます。</div></div><select id="pdfSceneSelect">${pdfSceneOptions(current().scenes.length?0:"")}</select></div><div class="row"><input id="pdfNewSceneName" placeholder="新しいシーン名"><button class="btn" onclick="addSceneFromPDF()">＋ シーンを追加して保存</button></div></div>
+ <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'kp')">選択範囲→KP</button></div></div>
+ <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
 }
 function appendTextToScene(pdfIndex,pageIndex,paraIndex,field){const p=current().pdfs[pdfIndex],pages=getPDFPages(p),t=splitParagraphs(pages[pageIndex]?.text||"")[paraIndex]||"";if(!t)return;const s=current(),label={body:'本文',info:'公開情報',kp:'KP情報'}[field],i=prompt(`どのシーンの${label}へ追加しますか？\n番号を入力（1〜${s.scenes.length}）`,String(s.scenes.length||1)),n=Number(i)-1;if(!Number.isInteger(n)||n<0||n>=s.scenes.length)return;s.scenes[n][field]=(s.scenes[n][field]?s.scenes[n][field]+'\n\n':'')+t;save();toast(`シーン${n+1}の${label}へ追加しました`)}
 
@@ -788,6 +809,58 @@ async function extractPDFWithPDFJS(bytes,doOCR,progress){
  progress(1,"読み込み完了");return {pages,pageData};
 }
 
+
+function pdfSceneOptions(selected){
+ const s=current();
+ return s.scenes.map((x,i)=>`<option value="${i}" ${String(i)===String(selected)?"selected":""}>${String(i+1).padStart(2,"0")}　${esc(x.title||"無題")}</option>`).join("");
+}
+function ensurePDFDestination(){
+ const sel=document.getElementById("pdfSceneSelect");
+ return sel?Number(sel.value):-1;
+}
+function addSceneFromPDF(){
+ const name=document.getElementById("pdfNewSceneName")?.value.trim();
+ if(!name)return toast("シーン名を入力してください");
+ const s=current();
+ s.scenes.push({title:name,body:"",info:"",kp:"",tags:[],checks:{body:false,info:false,judge:false,next:false}});
+ save();
+ const sel=document.getElementById("pdfSceneSelect");
+ if(sel){sel.innerHTML=pdfSceneOptions(s.scenes.length-1);sel.value=String(s.scenes.length-1);}
+ const input=document.getElementById("pdfNewSceneName");if(input)input.value="";
+ toast(`「${name}」を追加しました`);
+}
+function addPDFTextToDestination(pdfIndex,pageIndex,paraIndex,field){
+ const p=current().pdfs[pdfIndex],pages=getPDFPages(p),t=splitParagraphs(pages[pageIndex]?.text||"")[paraIndex]||"";
+ const n=ensurePDFDestination();
+ if(!t||!Number.isInteger(n)||n<0||n>=current().scenes.length)return toast("追加先のシーンを選択してください");
+ const s=current(),sc=s.scenes[n];
+ ensureSceneParts(sc);
+ const type=field==="body"?"body":field==="info"?"public":null;
+ if(type){
+   const parts=ensureSceneParts(sc), arr=parts.filter(x=>x.type===type);
+   const part=arr[arr.length-1];
+   if(part){part.text=(part.text?part.text+"\n\n":"")+t}
+   else parts.push(type==="body"?{type:"body",title:"描写 1",text:t,done:false}:{type:"public",title:"公開情報 1",text:t,revealed:false,judged:false});
+   sc.body=parts.filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
+   sc.info=parts.filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
+ }else sc.kp=(sc.kp?sc.kp+"\n\n":"")+t;
+ save(); toast(`「${sc.title}」へ追加しました`);
+}
+function addSelectedPDFToDestination(pdfIndex,field){
+ const t=selectedPDFText();
+ if(!t)return toast("PDFプレビューで範囲を選択してください");
+ const n=ensurePDFDestination();
+ if(!Number.isInteger(n)||n<0||n>=current().scenes.length)return toast("追加先のシーンを選択してください");
+ const sc=current().scenes[n]; ensureSceneParts(sc);
+ if(field==="body"||field==="info"){
+   const type=field==="body"?"body":"public",parts=ensureSceneParts(sc),arr=parts.filter(x=>x.type===type),part=arr[arr.length-1];
+   if(part)part.text=(part.text?part.text+"\n\n":"")+t;
+   else parts.push(type==="body"?{type:"body",title:"描写 1",text:t,done:false}:{type:"public",title:"公開情報 1",text:t,revealed:false,judged:false});
+   sc.body=parts.filter(x=>x.type==="body").map(x=>x.text).join("\n\n");
+   sc.info=parts.filter(x=>x.type==="public").map(x=>x.text).join("\n\n");
+ }else sc.kp=(sc.kp?sc.kp+"\n\n":"")+t;
+ save(); toast(`「${sc.title}」へ追加しました`);
+}
 function pdfToScenes(i){const p=current().pdfs[i],blocks=p.text.split(/\n{2,}(?=【\d+ページ】)/).filter(Boolean);blocks.forEach((b,n)=>{const m=b.match(/^【(\d+)ページ】\n?([\s\S]*)$/);current().scenes.push({title:`PDF ${m?m[1]:n+1}ページ`,body:m?m[2]:b,info:"",kp:""})});save();show("scenes")}
 async function delPDF(i){const p=current().pdfs[i];if(!p)return;if(confirm("このPDF情報を削除しますか？")){for(const id of (p.originalIds||[]))await deletePDFOriginal(id);current().pdfs.splice(i,1);save();render()}}
 function backup(c){
@@ -804,6 +877,25 @@ function importScenario(file){
  if(!file)return;const r=new FileReader();r.onload=()=>{try{const data=JSON.parse(r.result);data.id=crypto.randomUUID?.()||String(Date.now());repairScenario(data);scenarios.push(data);saveAll();switchScenario(data.id)}catch(e){alert("このファイルは復元できませんでした。")}};r.readAsText(file);
 }
 function repairScenario(s){s.scenes??=[];s.hos??=[];s.pcs??=[];s.actors??={npc:[],enemy:[]};s.actors.npc??=[];s.actors.enemy??=[];s.pdfs??=[];s.prep??={};s.kpInfo??="";s.bookmarks??=[];s.session??={currentScene:0,checks:{}};s.scenes.forEach(x=>{x.body??="";x.info??="";x.kp??="";x.checks??={body:false,info:false,judge:false,next:false}})}
+
+function help(c){
+ const items=[
+  ["ホーム","シナリオ全体の概要を確認できます。登録したシナリオを切り替えたり、現在の進行状況を確認する入口です。"],
+  ["今ここ","現在進行しているシーンをすぐ開けます。本番中に使う司令塔として利用できます。"],
+  ["検索","登録したシーン、HO、PC、NPC、敵、PDFの文章をまとめて検索できます。"],
+  ["シナリオ","シーンを登録・並べ替え・削除できます。シーン名は各シーンの編集画面から個別に変更できます。"],
+  ["KP情報","シナリオ全体に関わるKP向けメモをまとめて管理します。"],
+  ["HO・秘匿","HOごとの秘匿情報やメモを管理します。"],
+  ["PC・キャラクター","PCを登録します。キャラクターごとにいあきゃらのURLを保存して、いつでも開けます。"],
+  ["NPC・登場人物","NPCの能力値・技能・設定・KPメモを登録し、駒作成用にコピーできます。"],
+  ["敵・エネミー","敵もNPCと同じように能力値・技能・設定・KPメモを管理できます。"],
+  ["PDF","シナリオPDFを読み込み、ページや段落単位で文章を確認・コピーできます。抽出した文章は、ここから既存シーンへ追加したり、新しいシーンを作って追加できます。"],
+  ["準備","本番前にココフォリアへ貼り付ける情報をまとめて確認・コピーします。"],
+  ["使い方","このページです。各タブの役割を簡単に確認できます。"]
+ ];
+ c.innerHTML=`<div class="card"><div class="eyebrow">HOW TO USE</div><h2>このツールの使い方</h2><p class="muted">各項目をタップすると説明が開きます。</p></div>
+ <div class="helpList">${items.map((x,i)=>`<details class="helpItem" ${i===0?"open":""}><summary><span class="helpNo">${String(i+1).padStart(2,"0")}</span><b>${esc(x[0])}</b><span class="helpChevron">＋</span></summary><div class="helpBody">${esc(x[1])}</div></details>`).join("")}</div>`;
+}
 function prep(c){
  const s=current();c.innerHTML=`<div class="card"><div class="eyebrow">PREPARATION</div><h2>ココフォリア用準備</h2><p class="muted small">コピーして、登録したい場所へ貼り付けるだけの準備画面。</p></div>
  <div class="grid"><div class="card"><h3>シーン</h3>${s.scenes.map((x,i)=>`<div class="row between"><span>${esc(x.title)}</span><button class="btn ghost" onclick="copyText(current().scenes[${i}].body+'\\n\\n'+current().scenes[${i}].info)">コピー</button></div>`).join("")||"<p class='muted'>なし</p>"}</div>
