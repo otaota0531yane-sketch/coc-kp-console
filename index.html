@@ -266,6 +266,24 @@ input,select,textarea{max-width:100%}
 </section>
 </div>
 <script>
+async function importPlainTextFile(file){
+ const text=await file.text();
+ const normalized=(typeof normalizeExtractedText==="function")
+   ? normalizeExtractedText(text)
+   : text.replace(/\r\n?/g,"\n").trim();
+ current().pdfs??=[];
+ current().pdfs.push({
+   name:file.name||"テキストファイル",
+   type:"text",
+   text:normalized,
+   rawText:normalized,
+   pages:[{page:1,text:normalized}]
+ });
+ save();
+ render();
+ if(typeof toast==="function") toast("テキストを読み込みました");
+}
+
 const KEY="kp_console_v6";
 const NAV=[
  ["home","⌂","ホーム"],["session","▶","今ここ"],["search","⌕","検索"],["scenes","▤","シナリオ"],
@@ -674,20 +692,20 @@ function pdf(c){
   <div class="eyebrow">SCENARIO PDF</div><h2>PDF読み込み</h2>
   <p class="muted">PDFを読み込んだあと、プレビューでページごとの文章を確認できます。必要な範囲だけ選択して、本文・公開情報・KP情報へ取り込めます。</p>
   <div class="file">
-   <input id="pdfFile" type="file" accept="application/pdf" multiple>
+   <input id="pdfFile" type="file" accept=".pdf,.txt,.text,application/pdf,text/plain" multiple>
    
    <progress id="prog" hidden max="1" value="0"></progress><div id="pdfStatus" class="small muted"></div>
   </div>
  </div>
  <div class="list">${s.pdfs.map((p,i)=>`<div class="item pdfItem">
   <div class="row between"><div><span class="title">▣ ${esc(p.name)}</span><div class="meta">${p.pages}ページ　${p.text.length.toLocaleString()}文字</div></div>
-   <div class="row"><button class="btn" onclick="previewPDF(${i})">抽出テキスト</button>${p.originalIds?.length?`<button class="btn ghost" onclick="openOriginalPDF(${i},0)">原本を全ページ表示</button>`:`<label class="btn ghost fileBtn">原本を登録<input type="file" accept="application/pdf" onchange="attachOriginalPDF(${i},this.files[0])"></label>`}<button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
+   <div class="row"><button class="btn" onclick="previewPDF(${i})">抽出テキスト</button>${p.originalIds?.length?`<button class="btn ghost" onclick="openOriginalPDF(${i},0)">原本を全ページ表示</button>`:`<label class="btn ghost fileBtn">原本を登録<input type="file" accept=".pdf,.txt,.text,application/pdf,text/plain" onchange="attachOriginalPDF(${i},this.files[0])"></label>`}<button class="btn ghost" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn" onclick="pdfToScenes(${i})">全ページをシーン化</button><button class="btn danger" onclick="delPDF(${i})">削除</button></div>
   </div>
  </div>`).join("")||`<div class="empty">PDFがまだありません。</div>`}</div>`;
  document.getElementById("pdfFile").onchange=readPDFs;
 }
 
-function getPDFPages(p){
+function getPDFPages(p){ if(p?.type==="text" && (!p.pages||!p.pages.length)) return [{page:1,text:p.text||""}];
  if(Array.isArray(p.pageData)&&p.pageData.length)return p.pageData.map(x=>({page:x.page,text:x.text||""}));
  const chunks=String(p.text||"").split(/\n\n(?=【\d+ページ】)/).filter(Boolean);
  return chunks.map((x,i)=>{const m=x.match(/^【(\d+)ページ】\n?([\s\S]*)$/);return {page:m?Number(m[1]):i+1,text:m?m[2]:x}});
@@ -705,7 +723,7 @@ function previewPDF(i){
  const p=current().pdfs[i],pages=getPDFPages(p);
  const c=document.getElementById("content");
  c.innerHTML=`<div class="card"><div class="row between"><div><div class="eyebrow">EXTRACTED TEXT</div><h2>${esc(p.name)}</h2><p class="muted small">PDF原本とは別に、抽出した文章を段落単位で確認・コピーできます。</p></div><div class="row"><button class="btn ghost" onclick="${p.originalIds?.length?`openOriginalPDF(${i},0)`:''}">${p.originalIds?.length?'▣ 原本を全ページ表示':'原本なし'}</button><button class="btn ghost" onclick="show('pdf')">← PDF一覧</button></div></div>
- <div class="pdfDestination card"><div class="row between"><div><b>抽出した文章の追加先</b><div class="small muted">ここで既存シーンを選ぶか、新しいシーンを追加できます。</div></div><select id="pdfSceneSelect">${pdfSceneOptions(current().scenes.length?0:"")}</select></div><div class="row"><input id="pdfNewSceneName" placeholder="新しいシーン名"><button class="btn" onclick="addSceneFromPDF()">＋ シーンを追加して保存</button></div></div>
+ <div class="fileTypeHint">PDFだけでなく .txt / .text のテキストファイルも読み込めます。</div><div class="pdfDestination card"><div class="row between"><div><b>抽出した文章の追加先</b><div class="small muted">ここで既存シーンを選ぶか、新しいシーンを追加できます。</div></div><select id="pdfSceneSelect">${pdfSceneOptions(current().scenes.length?0:"")}</select></div><div class="row"><input id="pdfNewSceneName" placeholder="新しいシーン名"><button class="btn" onclick="addSceneFromPDF()">＋ シーンを追加して保存</button></div></div>
  <div class="previewActions"><button class="btn" onclick="copyText(current().pdfs[${i}].text)">全文をコピー</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'body')">選択範囲→本文</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'info')">選択範囲→公開</button><button class="btn ghost" onclick="addSelectedPDFToDestination(${i},'kp')">選択範囲→KP</button></div></div>
  <div class="pdfPages">${pages.map((x,n)=>{const ps=splitParagraphs(x.text);return `<div class="pdfPage"><div class="row between"><span class="pageLabel">PAGE ${String(x.page).padStart(3,'0')}</span><span class="muted small">${ps.length}段落</span></div><div class="paragraphList">${ps.map((q,k)=>`<div class="paragraphCard"><div class="paragraphHead"><span>段落 ${k+1}</span><button class="btn ghost" onclick="copyPDFPageParagraph(${i},${n},${k})">コピー</button></div><textarea class="pdfParagraphText" readonly>${esc(q)}</textarea><div class="row"><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'body')">→本文</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'info')">→公開</button><button class="btn ghost" onclick="addPDFTextToDestination(${i},${n},${k},'kp')">→KP</button></div></div>`).join('')}</div></div>`}).join('')}</div>`;
 }
@@ -749,6 +767,8 @@ async function readPDFs(e){
   const all=[],originalIds=[],sources=[];
   for(let fi=0;fi<files.length;fi++){
    const file=files[fi],id=(crypto.randomUUID?.()||String(Date.now()+Math.random()));
+ if(file && /\.(txt|text)$/i.test(file.name||"")){ importPlainTextFile(file); return; }
+
    const result=await extractPDFWithPDFJS(new Uint8Array(await file.arrayBuffer()),false,(a,msg)=>{pr.value=(fi+a)/files.length;st.textContent=`${fi+1}/${files.length}：${msg}`});
    await putPDFOriginal(id,file);originalIds.push(id);sources.push(file.name);
    result.pages.forEach((text,pi)=>all.push({page:all.length+1,text,source:file.name,sourcePage:pi+1}));
